@@ -1,0 +1,29 @@
+# Build arguments go here.
+# See "gn args <out_dir> --list" for available build arguments.
+is_official_build = true
+google_api_key = "no"
+google_default_client_id = "no"
+google_default_client_secret = "no"
+use_official_google_api_keys = false
+chrome_pgo_phase = 0
+current_cpu = "x64"
+enable_google_now = false
+enable_hotwording = false
+enable_iterator_debugging = false
+enable_nacl = true
+ffmpeg_branding = "Chrome"
+is_component_build = false
+is_debug = false
+proprietary_codecs = true
+symbol_level = 0
+target_cpu = "x64"
+exclude_unwind_tables = true
+remove_webcore_debug_symbols = true
+enable_webrtc = false
+enable_widevine = false
+#icu_use_data_file = true
+#syzygy_optimize = true
+enable_hevc_demuxing = true
+enable_ac3_eac3_audio_demuxing = true
+enable_mse_mpeg2ts_stream_parser = true
+
