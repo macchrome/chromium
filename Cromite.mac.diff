@@ -1,0 +1,114 @@
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index da2cf79cea..227b6fa971 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -2606,12 +2605,12 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
+     base::CommandLine* command_line,
+     int child_process_id) {
+ #if BUILDFLAG(IS_MAC)
+-  std::unique_ptr<metrics::ClientInfo> client_info =
+-      GoogleUpdateSettings::LoadMetricsClientInfo();
+-  if (client_info) {
+-    command_line->AppendSwitchASCII(switches::kMetricsClientID,
+-                                    client_info->client_id);
+-  }
++//  std::unique_ptr<metrics::ClientInfo> client_info =
++//      GoogleUpdateSettings::LoadMetricsClientInfo();
++//  if (client_info) {
++//    command_line->AppendSwitchASCII(switches::kMetricsClientID,
++//                                    client_info->client_id);
++//  }
+ #elif BUILDFLAG(IS_POSIX)
+ #if BUILDFLAG(IS_ANDROID)
+   bool enable_crash_reporter = true;
+diff --git a/ui/shell_dialogs/select_file_dialog_mac.mm b/ui/shell_dialogs/select_file_dialog_mac.mm
+index 0b8aaa3c0e..dba9f5d5fa 100644
+--- a/ui/shell_dialogs/select_file_dialog_mac.mm
++++ b/ui/shell_dialogs/select_file_dialog_mac.mm
+@@ -42,6 +42,10 @@ void SelectFileDialogImpl::ListenerDestroyed() {
+   listener_ = nullptr;
+ }
+ 
++void SelectFileDialogImpl::ShowToast(const std::string& message) {
++  // nothing to do, used only on android
++}
++
+ void SelectFileDialogImpl::FileWasSelected(
+     DialogData* dialog_data,
+     bool is_multi,
+diff --git a/ui/shell_dialogs/select_file_dialog_mac.h b/ui/shell_dialogs/select_file_dialog_mac.h
+index 0ba8eba4a5..0410b1def2 100644
+--- a/ui/shell_dialogs/select_file_dialog_mac.h
++++ b/ui/shell_dialogs/select_file_dialog_mac.h
+@@ -39,6 +39,8 @@ class SHELL_DIALOGS_EXPORT SelectFileDialogImpl : public ui::SelectFileDialog {
+   bool IsRunning(gfx::NativeWindow parent_window) const override;
+   void ListenerDestroyed() override;
+ 
++  void ShowToast(const std::string& message) override;
++
+  protected:
+   // SelectFileDialog implementation.
+   // |params| is user data we pass back via the Listener interface.
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+index 70355aa0ea..e106b30482 100644
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -2752,6 +2752,16 @@
+   <message name="IDS_SETTINGS_CLEAR_BROWSING_DATA" desc="Text for clear browsing data button in Privacy options">
+     Clear browsing data
+   </message>
++  <if expr="is_win or is_linux or is_macosx">
++    <message name="IDS_CLEAR_BROWSING_DATA_ATSTART_TAB_TITLE" desc="The title of the tab showing the at start clear browsing data options.">
++      At Close
++    </message>
++  </if>  
++  <if expr="is_android">
++    <message name="IDS_CLEAR_BROWSING_DATA_ATSTART_TAB_TITLE" desc="The title of the tab showing the at start clear browsing data options.">
++      At Startup
++    </message>
++  </if>
+   <message name="IDS_SETTINGS_CLEAR_DATA_DESCRIPTION" desc="Description for clear browsing data button in Privacy options. 'History' refers to browsing history. 'Cookies' refers to the technical meaning of a cookie, i.e. data saved by a website on the user's computer, as in when a website saves your preferences.">
+     Clear history, cookies, cache, and more
+   </message>
+diff --git a/chrome/browser/flag_descriptions.cc b/chrome/browser/flag_descriptions.cc
+index eaa2bde899..21b5b0c4b3 100644
+--- a/chrome/browser/flag_descriptions.cc
++++ b/chrome/browser/flag_descriptions.cc
+@@ -7435,11 +7576,15 @@ const char kAutofillCreditCardUploadDescription[] =
+ 
+ #endif  // defined(TOOLKIT_VIEWS) || BUILDFLAG(IS_ANDROID)
+ 
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) 
++const char kCTEnabledName[] = "Enable Certificate Transparency";
++const char kCTEnabledDescription[] =
++    "Enables compliance against the Certificate Transparency Policy, with reporting disabled.";
++
+ const char kElasticOverscrollName[] = "Elastic Overscroll";
+ const char kElasticOverscrollDescription[] =
+     "Enables Elastic Overscrolling on touchscreens and precision touchpads.";
+-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) 
+ 
+ #if BUILDFLAG(IS_WIN) ||                                      \
+     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)) || \
+diff --git a/chrome/browser/flag_descriptions.h b/chrome/browser/flag_descriptions.h
+index 5b2028c814..35b33d35b7 100644
+--- a/chrome/browser/flag_descriptions.h
++++ b/chrome/browser/flag_descriptions.h
+@@ -4293,10 +4386,13 @@ extern const char kAutofillCreditCardUploadDescription[];
+ 
+ #endif  // defined(TOOLKIT_VIEWS) || BUILDFLAG(IS_ANDROID)
+ 
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++extern const char kCTEnabledName[];
++extern const char kCTEnabledDescription[];
++
+ extern const char kElasticOverscrollName[];
+ extern const char kElasticOverscrollDescription[];
+-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#endif  //  BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) 
+ 
+ #if BUILDFLAG(IS_WIN) ||                                      \
+     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)) || \
