@@ -112,3 +112,40 @@ index 5b2028c814..35b33d35b7 100644
  
  #if BUILDFLAG(IS_WIN) ||                                      \
      (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)) || \
+diff --git a/chrome/browser/updater/BUILD.gn b/chrome/browser/updater/BUILD.gn
+index ac4300ae4f..fd02d33043 100644
+--- a/chrome/browser/updater/BUILD.gn
++++ b/chrome/browser/updater/BUILD.gn
+@@ -22,20 +22,11 @@ source_set("browser_updater_client") {
+     "//components/version_info",
+   ]
+ 
+-  if (is_win) {
+-    sources += [ "browser_updater_client_win.cc" ]
+-
+-    deps += [
+-      "//chrome/browser/google",
+-      "//chrome/install_static:install_static_util",
+-    ]
+-  }
+-
+   if (is_mac) {
+     sources += [
+-      "browser_updater_client_mac.mm",
+-      "browser_updater_helper_client_mac.h",
+-      "browser_updater_helper_client_mac.mm",
++  #    "browser_updater_client_mac.mm",
++  #    "browser_updater_helper_client_mac.h",
++  #    "browser_updater_helper_client_mac.mm",
+     ]
+ 
+     if (enable_updater) {
+@@ -47,7 +38,7 @@ source_set("browser_updater_client") {
+     deps += [
+       "//chrome/app:chromium_strings_grit",
+       "//chrome/app:generated_resources_grit",
+-      "//chrome/browser/google",
++  #    "//chrome/browser/google",
+       "//chrome/common:channel_info",
+       "//chrome/common:chrome_features",
+       "//ui/base",
