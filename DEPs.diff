@@ -1,0 +1,28 @@
+diff --git a/DEPS b/DEPS
+index c7df11791a..7e080671e4 100644
+--- a/DEPS
++++ b/DEPS
+@@ -677,7 +677,6 @@ deps = {
+ 
+   'src/chrome/installer/mac/third_party/xz/xz': {
+       'url': Var('chromium_git') + '/chromium/deps/xz.git' + '@' + 'eecaf55632ca72e90eb2641376bce7cdbc7284f7',
+-      'condition': 'checkout_mac',
+   },
+ 
+   'src/third_party/libc++/src':
+@@ -1359,7 +1358,6 @@ deps = {
+ 
+   'src/third_party/google_toolbox_for_mac/src': {
+       'url': Var('chromium_git') + '/external/github.com/google/google-toolbox-for-mac.git' + '@' + Var('google_toolbox_for_mac_revision'),
+-      'condition': 'checkout_ios or checkout_mac',
+   },
+ 
+   'src/third_party/google-truth': {
+@@ -1667,7 +1665,6 @@ deps = {
+               'version': '4wxov_ILjFdgBumBqgUgOgIcr4kcMh7i4b4oJi_cLjcC',
+           },
+       ],
+-      'condition': 'host_os == "linux" and checkout_mac',
+       'dep_type': 'cipd',
+   },
+ 
