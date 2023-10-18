@@ -1,0 +1,167 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Mon, 26 Apr 2021 13:28:24 +0000
+Subject: Add AllowUserCertificates flag
+
+Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../org/chromium/chrome/browser/app/ChromeActivity.java    | 3 +++
+ chrome/browser/about_flags.cc                              | 7 +++++++
+ chrome/browser/flag_descriptions.cc                        | 5 +++++
+ chrome/browser/flag_descriptions.h                         | 3 +++
+ chrome/browser/flags/android/chrome_feature_list.cc        | 5 +++++
+ chrome/browser/flags/android/chrome_feature_list.h         | 1 +
+ .../chromium/chrome/browser/flags/ChromeFeatureList.java   | 4 ++++
+ net/android/java/src/org/chromium/net/X509Util.java        | 5 +++++
+ 8 files changed, 33 insertions(+)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+@@ -231,6 +231,7 @@ import org.chromium.content_public.browser.ScreenOrientationProvider;
+ import org.chromium.content_public.browser.SelectionPopupController;
+ import org.chromium.content_public.browser.WebContents;
+ import org.chromium.content_public.common.ContentSwitches;
++import org.chromium.net.X509Util;
+ import org.chromium.printing.PrintManagerDelegateImpl;
+ import org.chromium.printing.PrintingController;
+ import org.chromium.printing.PrintingControllerImpl;
+@@ -981,6 +982,8 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
+         super.onStartWithNative();
+         ChromeActivitySessionTracker.getInstance().onStartWithNative();
+         ChromeCachedFlags.getInstance().cacheNativeFlags();
++        X509Util.AllowUserCertificates = ChromeFeatureList.isEnabled(
++                                            ChromeFeatureList.ALLOW_USER_CERTIFICATES);
+ 
+         // postDeferredStartupIfNeeded() is called in TabModelSelectorTabObsever#onLoadStopped(),
+         // #onPageLoadFinished() and #onCrash(). If we are not actively loading a tab (e.g.
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -9367,6 +9367,13 @@ const FeatureEntry kFeatureEntries[] = {
+      flag_descriptions::kEnableDrDcDescription, kOsAll,
+      FEATURE_VALUE_TYPE(features::kEnableDrDc)},
+ 
++#if BUILDFLAG(IS_ANDROID)
++    {"allow-user-certificates",
++     flag_descriptions::kAllowUserCertificatesName,
++     flag_descriptions::kAllowUserCertificatesDescription, kOsAndroid,
++     FEATURE_VALUE_TYPE(chrome::android::kAllowUserCertificates)},
++#endif  // BUILDFLAG(IS_ANDROID)
++
+     {"force-gpu-main-thread-to-normal-priority-drdc",
+      flag_descriptions::kForceGpuMainThreadToNormalPriorityDrDcName,
+      flag_descriptions::kForceGpuMainThreadToNormalPriorityDrDcDescription,
+diff --git a/chrome/browser/flag_descriptions.cc b/chrome/browser/flag_descriptions.cc
+--- a/chrome/browser/flag_descriptions.cc
++++ b/chrome/browser/flag_descriptions.cc
+@@ -16,6 +16,11 @@
+ 
+ namespace flag_descriptions {
+ 
++const char kAllowUserCertificatesName[] = "Allow user certificates";
++const char kAllowUserCertificatesDescription[] =
++    "Allow user CA certificates during "
++    "validation of the certificate chain";
++
+ const char kAccelerated2dCanvasName[] = "Accelerated 2D canvas";
+ const char kAccelerated2dCanvasDescription[] =
+     "Enables the use of the GPU to perform 2d canvas rendering instead of "
+diff --git a/chrome/browser/flag_descriptions.h b/chrome/browser/flag_descriptions.h
+--- a/chrome/browser/flag_descriptions.h
++++ b/chrome/browser/flag_descriptions.h
+@@ -42,6 +42,9 @@ namespace flag_descriptions {
+ 
+ // Cross-platform -------------------------------------------------------------
+ 
++extern const char kAllowUserCertificatesName[];
++extern const char kAllowUserCertificatesDescription[];
++
+ extern const char kAccelerated2dCanvasName[];
+ extern const char kAccelerated2dCanvasDescription[];
+ 
+diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
+--- a/chrome/browser/flags/android/chrome_feature_list.cc
++++ b/chrome/browser/flags/android/chrome_feature_list.cc
+@@ -145,6 +145,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
+     &feed::kFeedSignedOutViewDemotion,
+     &feed::kFeedUserInteractionReliabilityReport,
+     &feed::kInterestFeedContentSuggestions,
++    &kAllowUserCertificates,
+     &feed::kInterestFeedV2,
+     &feed::kInterestFeedV2Autoplay,
+     &feed::kInterestFeedV2Hearts,
+@@ -473,6 +474,10 @@ BASE_FEATURE(kSearchReadyOmniboxFeature,
+              "SearchReadyOmnibox",
+              base::FEATURE_DISABLED_BY_DEFAULT);
+ 
++BASE_FEATURE(kAllowUserCertificates,
++             "AllowUserCertificates",
++             base::FEATURE_DISABLED_BY_DEFAULT);
++
+ BASE_FEATURE(kFocusOmniboxInIncognitoTabIntents,
+              "FocusOmniboxInIncognitoTabIntents",
+              base::FEATURE_ENABLED_BY_DEFAULT);
+diff --git a/chrome/browser/flags/android/chrome_feature_list.h b/chrome/browser/flags/android/chrome_feature_list.h
+--- a/chrome/browser/flags/android/chrome_feature_list.h
++++ b/chrome/browser/flags/android/chrome_feature_list.h
+@@ -22,6 +22,7 @@ BASE_DECLARE_FEATURE(kAdvancedPeripheralsSupport);
+ BASE_DECLARE_FEATURE(kAdvancedPeripheralsSupportTabStrip);
+ BASE_DECLARE_FEATURE(kAllowNewIncognitoTabIntents);
+ BASE_DECLARE_FEATURE(kAndroidAppIntegration);
++BASE_DECLARE_FEATURE(kAllowUserCertificates);
+ BASE_DECLARE_FEATURE(kAndroidAppIntegrationSafeSearch);
+ BASE_DECLARE_FEATURE(kAndroidHatsRefactor);
+ BASE_DECLARE_FEATURE(kAndroidSearchEngineChoiceNotification);
+diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
+--- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
++++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
+@@ -98,6 +98,7 @@ public abstract class ChromeFeatureList {
+     }
+ 
+     /* Alphabetical: */
++    public static final String ALLOW_USER_CERTIFICATES = "AllowUserCertificates";
+     public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR = "AdaptiveButtonInTopToolbar";
+     public static final String ADAPTIVE_BUTTON_IN_TOP_TOOLBAR_TRANSLATE =
+             "AdaptiveButtonInTopToolbarTranslate";
+@@ -514,6 +515,8 @@ public abstract class ChromeFeatureList {
+     /* Alphabetical: */
+     public static final CachedFlag sAndroidAppIntegration =
+             new CachedFlag(ANDROID_APP_INTEGRATION, false);
++    public static final CachedFlag sAllowUserCertificates =
++            new CachedFlag(ALLOW_USER_CERTIFICATES, false);
+     public static final CachedFlag sAppMenuMobileSiteOption =
+             new CachedFlag(APP_MENU_MOBILE_SITE_OPTION, false);
+     public static final CachedFlag sBackGestureActivityTabProvider =
+@@ -634,6 +637,7 @@ public abstract class ChromeFeatureList {
+     public static final List<CachedFlag> sFlagsCachedFullBrowser = List.of(
+             // clang-format off
+         sAndroidAppIntegration,
++        sAllowUserCertificates,
+         sAppMenuMobileSiteOption,
+         sBackGestureActivityTabProvider,
+         sBackGestureRefactorActivityAndroid,
+diff --git a/net/android/java/src/org/chromium/net/X509Util.java b/net/android/java/src/org/chromium/net/X509Util.java
+--- a/net/android/java/src/org/chromium/net/X509Util.java
++++ b/net/android/java/src/org/chromium/net/X509Util.java
+@@ -545,6 +545,8 @@ public class X509Util {
+         return userRootBytes.toArray(new byte[0][]);
+     }
+ 
++    public static boolean AllowUserCertificates = false;
++
+     public static AndroidCertVerifyResult verifyServerCertificates(byte[][] certChain,
+                                                                    String authType,
+                                                                    String host)
+@@ -631,6 +633,9 @@ public class X509Util {
+                 isIssuedByKnownRoot = isKnownRoot(root);
+             }
+ 
++            if (AllowUserCertificates == false && isIssuedByKnownRoot == false)
++                return new AndroidCertVerifyResult(CertVerifyStatusAndroid.NO_TRUSTED_ROOT);
++
+             return new AndroidCertVerifyResult(CertVerifyStatusAndroid.OK,
+                                                isIssuedByKnownRoot, verifiedChain);
+         }
+--
+2.25.1

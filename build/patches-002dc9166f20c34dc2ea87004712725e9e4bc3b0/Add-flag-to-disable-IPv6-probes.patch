@@ -1,0 +1,159 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sun, 18 Nov 2018 13:06:49 +0100
+Subject: Add flag to disable IPv6 probes
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/browser/about_flags.cc           |  4 ++++
+ chrome/browser/flag_descriptions.cc     |  4 ++++
+ chrome/browser/flag_descriptions.h      |  3 +++
+ net/BUILD.gn                            |  1 +
+ net/base/features.cc                    |  4 ++++
+ net/base/features.h                     |  3 +++
+ net/dns/host_resolver_manager.cc        | 11 +++++++++++
+ services/network/public/cpp/features.cc |  5 +++++
+ services/network/public/cpp/features.h  |  1 +
+ 9 files changed, 36 insertions(+)
+
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -6605,6 +6605,10 @@ const FeatureEntry kFeatureEntries[] = {
+     {"enable-reader-mode-in-cct", flag_descriptions::kReaderModeInCCTName,
+      flag_descriptions::kReaderModeInCCTDescription, kOsAndroid,
+      FEATURE_VALUE_TYPE(chrome::android::kReaderModeInCCT)},
++    {"ipv6-probing",
++     flag_descriptions::kIPv6ProbingName,
++     flag_descriptions::kIPv6ProbingDescription, kOsAll,
++     FEATURE_VALUE_TYPE(net::features::kIPv6Probing)},
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+     {"shopping-collection",
+diff --git a/chrome/browser/flag_descriptions.cc b/chrome/browser/flag_descriptions.cc
+--- a/chrome/browser/flag_descriptions.cc
++++ b/chrome/browser/flag_descriptions.cc
+@@ -3895,6 +3895,10 @@ const char kCCTTextFragmentLookupApiEnabledName[] =
+ const char kCCTTextFragmentLookupApiEnabledDescription[] =
+     "Enable CCT API to lookup text fragments";
+ 
++const char kIPv6ProbingName[] = "Enable IPv6 probing.";
++const char kIPv6ProbingDescription[] =
++    "Send IPv6 probes to a RIPE DNS address to verify IPv6 connectivity.";
++
+ const char kChimeAlwaysShowNotificationDescription[] =
+     "A debug flag to always show Chime notification after receiving a payload.";
+ const char kChimeAlwaysShowNotificationName[] =
+diff --git a/chrome/browser/flag_descriptions.h b/chrome/browser/flag_descriptions.h
+--- a/chrome/browser/flag_descriptions.h
++++ b/chrome/browser/flag_descriptions.h
+@@ -879,6 +879,9 @@ extern const char kEnableWasmStringrefName[];
+ extern const char kEnableWasmStringrefDescription[];
+ 
+ extern const char kEnableWasmTieringName[];
++extern const char kIPv6ProbingName[];
++extern const char kIPv6ProbingDescription[];
++
+ extern const char kEnableWasmTieringDescription[];
+ 
+ extern const char kEvDetailsInPageInfoName[];
+diff --git a/net/BUILD.gn b/net/BUILD.gn
+--- a/net/BUILD.gn
++++ b/net/BUILD.gn
+@@ -1096,6 +1096,7 @@ component("net") {
+     "//build:chromeos_buildflags",
+     "//net/data/ssl/chrome_root_store:gen_root_store_inc",
+     "//net/http:transport_security_state_generated_files",
++    "//components/network_session_configurator/common"
+   ]
+ 
+   public_deps = [
+diff --git a/net/base/features.cc b/net/base/features.cc
+--- a/net/base/features.cc
++++ b/net/base/features.cc
+@@ -41,6 +41,10 @@ BASE_FEATURE(kUseDnsHttpsSvcb,
+ const base::FeatureParam<bool> kUseDnsHttpsSvcbEnforceSecureResponse{
+     &kUseDnsHttpsSvcb, "UseDnsHttpsSvcbEnforceSecureResponse", false};
+ 
++BASE_FEATURE(kIPv6Probing,
++             "IPv6Probing",
++             base::FEATURE_ENABLED_BY_DEFAULT);
++
+ const base::FeatureParam<base::TimeDelta> kUseDnsHttpsSvcbInsecureExtraTimeMax{
+     &kUseDnsHttpsSvcb, "UseDnsHttpsSvcbInsecureExtraTimeMax",
+     base::Milliseconds(50)};
+diff --git a/net/base/features.h b/net/base/features.h
+--- a/net/base/features.h
++++ b/net/base/features.h
+@@ -52,6 +52,9 @@ NET_EXPORT BASE_DECLARE_FEATURE(kUseDnsHttpsSvcb);
+ NET_EXPORT extern const base::FeatureParam<bool>
+     kUseDnsHttpsSvcbEnforceSecureResponse;
+ 
++// Enable IPv6 ping probes to RIPE DNS.
++NET_EXPORT BASE_DECLARE_FEATURE(kIPv6Probing);
++
+ // If we are still waiting for an HTTPS transaction after all the
+ // other transactions in an insecure DnsTask have completed, we will compute a
+ // timeout for the remaining transaction. The timeout will be
+diff --git a/net/dns/host_resolver_manager.cc b/net/dns/host_resolver_manager.cc
+--- a/net/dns/host_resolver_manager.cc
++++ b/net/dns/host_resolver_manager.cc
+@@ -110,6 +110,7 @@
+ #include "net/log/net_log_event_type.h"
+ #include "net/log/net_log_source.h"
+ #include "net/log/net_log_source_type.h"
++#include "services/network/public/cpp/features.h"
+ #include "net/log/net_log_with_source.h"
+ #include "net/socket/client_socket_factory.h"
+ #include "net/url_request/url_request_context.h"
+@@ -685,6 +686,9 @@ class HostResolverManager::RequestImpl
+     // request source is LOCAL_ONLY. This is due to LOCAL_ONLY requiring a
+     // synchronous response, so it cannot wait on an async probe result and
+     // cannot make assumptions about reachability.
++    if (!base::FeatureList::IsEnabled(features::kIPv6Probing)) {
++      return OK;
++    }
+     if (parameters_.source == HostResolverSource::LOCAL_ONLY) {
+       int rv = resolver_->StartIPv6ReachabilityCheck(
+           source_net_log_, GetClientSocketFactory(),
+@@ -3903,6 +3907,13 @@ int HostResolverManager::StartIPv6ReachabilityCheck(
+     return OK;
+   }
+ 
++  if (!base::FeatureList::IsEnabled(net::features::kIPv6Probing)) {
++    probing_ipv6_ = false;
++    last_ipv6_probe_result_ = false;
++    last_ipv6_probe_time_ = base::TimeTicks();
++    return OK;
++  }
++
+   if (probing_ipv6_) {
+     ipv6_request_callbacks_.push_back(std::move(callback));
+     return ERR_IO_PENDING;
+diff --git a/services/network/public/cpp/features.cc b/services/network/public/cpp/features.cc
+--- a/services/network/public/cpp/features.cc
++++ b/services/network/public/cpp/features.cc
+@@ -31,6 +31,11 @@ BASE_FEATURE(kThrottleDelayable,
+              "ThrottleDelayable",
+              base::FEATURE_ENABLED_BY_DEFAULT);
+ 
++// Enable IPv6 ping probes to RIPE DNS.
++BASE_FEATURE(kIPv6Probing,
++             "IPv6Probing",
++             base::FEATURE_ENABLED_BY_DEFAULT);
++
+ // When kPriorityRequestsDelayableOnSlowConnections is enabled, HTTP
+ // requests fetched from a SPDY/QUIC/H2 proxies can be delayed by the
+ // ResourceScheduler just as HTTP/1.1 resources are. However, requests from such
+diff --git a/services/network/public/cpp/features.h b/services/network/public/cpp/features.h
+--- a/services/network/public/cpp/features.h
++++ b/services/network/public/cpp/features.h
+@@ -17,6 +17,7 @@ namespace features {
+ COMPONENT_EXPORT(NETWORK_CPP) BASE_DECLARE_FEATURE(kNetworkErrorLogging);
+ COMPONENT_EXPORT(NETWORK_CPP) BASE_DECLARE_FEATURE(kReporting);
+ COMPONENT_EXPORT(NETWORK_CPP) BASE_DECLARE_FEATURE(kThrottleDelayable);
++COMPONENT_EXPORT(NETWORK_CPP) BASE_DECLARE_FEATURE(kIPv6Probing);
+ COMPONENT_EXPORT(NETWORK_CPP)
+ BASE_DECLARE_FEATURE(kDelayRequestsOnMultiplexedConnections);
+ COMPONENT_EXPORT(NETWORK_CPP)
+--
+2.25.1

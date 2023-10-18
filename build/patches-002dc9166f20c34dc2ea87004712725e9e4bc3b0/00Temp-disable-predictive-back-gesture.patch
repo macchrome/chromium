@@ -1,0 +1,23 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Sat, 12 Aug 2023 14:48:57 +0000
+Subject: Temp disable predictive back gesture
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/android/java/AndroidManifest.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
+--- a/chrome/android/java/AndroidManifest.xml
++++ b/chrome/android/java/AndroidManifest.xml
+@@ -187,7 +187,7 @@ by a child template that "extends" this file.
+         android:networkSecurityConfig="@xml/network_security_config"
+         android:allowAudioPlaybackCapture="false"
+         android:appComponentFactory="org.chromium.chrome.browser.base.SplitCompatAppComponentFactory"
+-        android:enableOnBackInvokedCallback="true"
++        android:enableOnBackInvokedCallback="false"
+         {% block extra_application_attributes %}{% endblock %}>
+ 
+         {% if channel in ['canary', 'dev', 'default'] %}
+--
+2.25.1

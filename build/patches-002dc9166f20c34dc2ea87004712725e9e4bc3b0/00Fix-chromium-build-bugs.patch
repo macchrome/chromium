@@ -1,0 +1,429 @@
+From: Your Name <you@example.com>
+Date: Wed, 6 Sep 2023 17:55:01 +0000
+Subject: Fix chromium build bugs
+
+---
+ BUILD.gn                                           |  1 -
+ .../AutofillSaveCardBottomSheetBridge.java         |  2 +-
+ .../org/chromium/chrome/browser/tab/TabImpl.java   |  2 +-
+ ...me_browser_main_extra_parts_nacl_deprecation.cc |  2 ++
+ chrome/browser/download/download_ui_model.cc       |  2 ++
+ .../api/autofill_private/autofill_util.cc          |  2 ++
+ .../api/reading_list/reading_list_event_router.h   |  2 +-
+ .../navigation_predictor_metrics_document_data.h   |  2 ++
+ chrome/browser/safe_browsing/BUILD.gn              |  1 +
+ ..._auction_consented_debugging_infobar_delegate.h |  2 +-
+ .../read_anything/read_anything_container_view.cc  | 12 ++++++------
+ chrome/browser/ui/views/tabs/tab.cc                |  2 +-
+ chrome/browser/ui/views/tabs/tab_group_header.cc   |  2 +-
+ .../app_management/app_management_page_handler.cc  |  2 ++
+ chrome/browser/usb/chrome_usb_delegate.cc          |  2 ++
+ .../autofill/core/browser/data_model/address.cc    |  4 ++--
+ components/autofill/core/browser/form_structure.cc |  2 ++
+ .../core/browser/ui/suggestion_selection.cc        | 12 +-----------
+ .../core/browser/webdata/autofill_table.cc         | 12 ++++++------
+ components/omnibox/browser/omnibox_field_trial.cc  |  4 ++--
+ .../phishing_classifier/phishing_image_embedder.cc | 14 +++-----------
+ content/browser/browser_interface_binders.cc       |  1 +
+ crypto/BUILD.gn                                    |  3 +++
+ net/BUILD.gn                                       |  1 +
+ third_party/libevent/BUILD.gn                      |  2 ++
+ 25 files changed, 48 insertions(+), 45 deletions(-)
+
+diff --git a/BUILD.gn b/BUILD.gn
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -396,7 +396,6 @@ group("gn_all") {
+           "//android_webview:empty_group",
+           "//android_webview/test",
+           "//android_webview/tools/automated_ui_tests:webview_ui_test_app",
+-          "//android_webview/tools/captured_sites_tests:captured_sites_test_app",
+           "//android_webview/tools/system_webview_shell",
+           "//chrome/android:chrome_junit_tests",
+           "//chrome/android:chrome_public_apk",
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/autofill/AutofillSaveCardBottomSheetBridge.java b/chrome/android/java/src/org/chromium/chrome/browser/autofill/AutofillSaveCardBottomSheetBridge.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/autofill/AutofillSaveCardBottomSheetBridge.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/autofill/AutofillSaveCardBottomSheetBridge.java
+@@ -42,7 +42,7 @@ public class AutofillSaveCardBottomSheetBridge {
+                 AutofillSaveCardBottomSheetCoordinator::new);
+     }
+ 
+-    @CalledByNative
++    //@CalledByNative
+     @VisibleForTesting
+     /*package*/ AutofillSaveCardBottomSheetBridge(long nativeAutofillSaveCardBottomSheetBridge,
+             WindowAndroid window, TabModel tabModel, CoordinatorFactory coordinatorFactory) {
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java
+@@ -385,7 +385,7 @@ public class TabImpl implements Tab {
+     }
+ 
+     @Override
+-    @CalledByNative
++    // @CalledByNative
+     public int getId() {
+         return mId;
+     }
+diff --git a/chrome/browser/chrome_browser_main_extra_parts_nacl_deprecation.cc b/chrome/browser/chrome_browser_main_extra_parts_nacl_deprecation.cc
+--- a/chrome/browser/chrome_browser_main_extra_parts_nacl_deprecation.cc
++++ b/chrome/browser/chrome_browser_main_extra_parts_nacl_deprecation.cc
+@@ -16,6 +16,7 @@
+ 
+ namespace {
+ 
++#if BUILDFLAG(ENABLE_NACL)
+ bool ShouldNaClBeAllowed() {
+   // Enabled by policy.
+   if (g_browser_process->local_state()->GetBoolean(
+@@ -24,6 +25,7 @@ bool ShouldNaClBeAllowed() {
+   }
+   return base::FeatureList::IsEnabled(kNaclAllow);
+ }
++#endif
+ 
+ }  // namespace
+ 
+diff --git a/chrome/browser/download/download_ui_model.cc b/chrome/browser/download/download_ui_model.cc
+--- a/chrome/browser/download/download_ui_model.cc
++++ b/chrome/browser/download/download_ui_model.cc
+@@ -177,6 +177,7 @@ bool ShouldShowWarningForNoSafeBrowsing(Profile* profile) {
+ #endif
+ }
+ 
++#if !BUILDFLAG(IS_ANDROID)
+ bool CanUserTurnOnSafeBrowsing(Profile* profile) {
+ #if BUILDFLAG(FULL_SAFE_BROWSING)
+   return !safe_browsing::IsSafeBrowsingPolicyManaged(*profile->GetPrefs());
+@@ -184,6 +185,7 @@ bool CanUserTurnOnSafeBrowsing(Profile* profile) {
+   return false;
+ #endif
+ }
++#endif
+ 
+ }  // namespace
+ 
+diff --git a/chrome/browser/extensions/api/autofill_private/autofill_util.cc b/chrome/browser/extensions/api/autofill_private/autofill_util.cc
+--- a/chrome/browser/extensions/api/autofill_private/autofill_util.cc
++++ b/chrome/browser/extensions/api/autofill_private/autofill_util.cc
+@@ -42,6 +42,7 @@ namespace {
+ // Get the multi-valued element for |type| and return it as a |vector|.
+ // TODO(khorimoto): remove this function since multi-valued types are
+ // deprecated.
++#if BUILDFLAG(IS_ANDROID)
+ std::vector<std::string> GetList(const autofill::AutofillProfile& profile,
+                                  autofill::ServerFieldType type) {
+   std::vector<std::string> list;
+@@ -65,6 +66,7 @@ std::vector<std::string> GetList(const autofill::AutofillProfile& profile,
+ 
+   return list;
+ }
++#endif
+ 
+ // Gets the string corresponding to |type| from |profile|.
+ std::string GetStringFromProfile(const autofill::AutofillProfile& profile,
+diff --git a/chrome/browser/extensions/api/reading_list/reading_list_event_router.h b/chrome/browser/extensions/api/reading_list/reading_list_event_router.h
+--- a/chrome/browser/extensions/api/reading_list/reading_list_event_router.h
++++ b/chrome/browser/extensions/api/reading_list/reading_list_event_router.h
+@@ -33,7 +33,7 @@ class ReadingListEventRouter : public KeyedService,
+ 
+  private:
+   // ReadingListModelObserver:
+-  void ReadingListModelLoaded(const ReadingListModel* model) override{};
++  void ReadingListModelLoaded(const ReadingListModel* model) override {}
+   void ReadingListDidAddEntry(const ReadingListModel* model,
+                               const GURL& url,
+                               reading_list::EntrySource source) override;
+diff --git a/chrome/browser/navigation_predictor/navigation_predictor_metrics_document_data.h b/chrome/browser/navigation_predictor/navigation_predictor_metrics_document_data.h
+--- a/chrome/browser/navigation_predictor/navigation_predictor_metrics_document_data.h
++++ b/chrome/browser/navigation_predictor/navigation_predictor_metrics_document_data.h
+@@ -68,6 +68,8 @@ class NavigationPredictorMetricsDocumentData
+     UserInteractionsData();
+     UserInteractionsData(const UserInteractionsData&);
+ 
++    UserInteractionsData& operator=(UserInteractionsData&&) noexcept = default;
++
+     // True if the anchor element is still in viewport, otherwise false.
+     bool is_in_viewport = false;
+     // True if the pointer is still hovering over the anchor element,
+diff --git a/chrome/browser/safe_browsing/BUILD.gn b/chrome/browser/safe_browsing/BUILD.gn
+--- a/chrome/browser/safe_browsing/BUILD.gn
++++ b/chrome/browser/safe_browsing/BUILD.gn
+@@ -210,6 +210,7 @@ static_library("safe_browsing") {
+       "//components/version_info",
+       "//content/public/browser",
+       "//services/preferences/public/mojom:mojom",
++      "//third_party/flatbuffers:flatbuffers",
+     ]
+     if (safe_browsing_mode == 1) {
+       # "Safe Browsing Full" files in addition to the "basic" ones to use for
+diff --git a/chrome/browser/ui/startup/bidding_and_auction_consented_debugging_infobar_delegate.h b/chrome/browser/ui/startup/bidding_and_auction_consented_debugging_infobar_delegate.h
+--- a/chrome/browser/ui/startup/bidding_and_auction_consented_debugging_infobar_delegate.h
++++ b/chrome/browser/ui/startup/bidding_and_auction_consented_debugging_infobar_delegate.h
+@@ -12,7 +12,7 @@
+ 
+ namespace content {
+ class WebContents;
+-};
++}
+ 
+ // An infobar for Chrome for Testing, which displays a message saying that this
+ // flavor of chrome is unsupported and does not auto-update.
+diff --git a/chrome/browser/ui/views/side_panel/read_anything/read_anything_container_view.cc b/chrome/browser/ui/views/side_panel/read_anything/read_anything_container_view.cc
+--- a/chrome/browser/ui/views/side_panel/read_anything/read_anything_container_view.cc
++++ b/chrome/browser/ui/views/side_panel/read_anything/read_anything_container_view.cc
+@@ -23,12 +23,12 @@
+ 
+ namespace {
+ 
+-int GetNormalizedFontScale(double font_scale) {
+-  DCHECK(font_scale >= kReadAnythingMinimumFontScale &&
+-         font_scale <= kReadAnythingMaximumFontScale);
+-  return (font_scale - kReadAnythingMinimumFontScale) *
+-         (1 / kReadAnythingFontScaleIncrement);
+-}
++// int GetNormalizedFontScale(double font_scale) {
++//   DCHECK(font_scale >= kReadAnythingMinimumFontScale &&
++//          font_scale <= kReadAnythingMaximumFontScale);
++//   return (font_scale - kReadAnythingMinimumFontScale) *
++//          (1 / kReadAnythingFontScaleIncrement);
++// }
+ 
+ }  // namespace
+ 
+diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
+--- a/chrome/browser/ui/views/tabs/tab.cc
++++ b/chrome/browser/ui/views/tabs/tab.cc
+@@ -536,7 +536,7 @@ bool Tab::OnMousePressed(const ui::MouseEvent& event) {
+ }
+ 
+ bool Tab::OnMouseDragged(const ui::MouseEvent& event) {
+-  controller_->ContinueDrag(this, event);
++  (void)controller_->ContinueDrag(this, event); // fix error: ignoring return value of function declared with 'nodiscard' attribute [-Werror,-Wunused-result]
+   return true;
+ }
+ 
+diff --git a/chrome/browser/ui/views/tabs/tab_group_header.cc b/chrome/browser/ui/views/tabs/tab_group_header.cc
+--- a/chrome/browser/ui/views/tabs/tab_group_header.cc
++++ b/chrome/browser/ui/views/tabs/tab_group_header.cc
+@@ -207,7 +207,7 @@ bool TabGroupHeader::OnMousePressed(const ui::MouseEvent& event) {
+ }
+ 
+ bool TabGroupHeader::OnMouseDragged(const ui::MouseEvent& event) {
+-  tab_slot_controller_->ContinueDrag(this, event);
++  (void)tab_slot_controller_->ContinueDrag(this, event);
+   return true;
+ }
+ 
+diff --git a/chrome/browser/ui/webui/app_management/app_management_page_handler.cc b/chrome/browser/ui/webui/app_management/app_management_page_handler.cc
+--- a/chrome/browser/ui/webui/app_management/app_management_page_handler.cc
++++ b/chrome/browser/ui/webui/app_management/app_management_page_handler.cc
+@@ -137,6 +137,7 @@ bool CanShowDefaultAppAssociationsUi() {
+ #endif
+ }
+ 
++#if BUILDFLAG(IS_CHROMEOS)
+ // Returns a list of intent filters that support http/https given an app ID.
+ apps::IntentFilters GetSupportedLinkIntentFilters(Profile* profile,
+                                                   const std::string& app_id) {
+@@ -171,6 +172,7 @@ std::vector<std::string> GetSupportedLinks(Profile* profile,
+   return std::vector<std::string>(supported_links.begin(),
+                                   supported_links.end());
+ }
++#endif
+ 
+ #if !BUILDFLAG(IS_CHROMEOS)
+ std::vector<std::string> GetSupportedLinksForPWAs(
+diff --git a/chrome/browser/usb/chrome_usb_delegate.cc b/chrome/browser/usb/chrome_usb_delegate.cc
+--- a/chrome/browser/usb/chrome_usb_delegate.cc
++++ b/chrome/browser/usb/chrome_usb_delegate.cc
+@@ -46,6 +46,7 @@ UsbChooserContext* GetChooserContext(content::BrowserContext* browser_context) {
+   return profile ? UsbChooserContextFactory::GetForProfile(profile) : nullptr;
+ }
+ 
++#if !BUILDFLAG(IS_ANDROID)
+ UsbConnectionTracker* GetConnectionTracker(
+     content::BrowserContext* browser_context,
+     bool create) {
+@@ -55,6 +56,7 @@ UsbConnectionTracker* GetConnectionTracker(
+   return profile ? UsbConnectionTrackerFactory::GetForProfile(profile, create)
+                  : nullptr;
+ }
++#endif
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+ // These extensions can claim the smart card USB class and automatically gain
+diff --git a/components/autofill/core/browser/data_model/address.cc b/components/autofill/core/browser/data_model/address.cc
+--- a/components/autofill/core/browser/data_model/address.cc
++++ b/components/autofill/core/browser/data_model/address.cc
+@@ -30,7 +30,7 @@
+ 
+ namespace autofill {
+ 
+-Address::Address() : structured_address_(std::make_unique<AddressNode>()){};
++Address::Address() : structured_address_(std::make_unique<AddressNode>()){}
+ 
+ Address::Address(const Address& address) {
+   *this = address;
+@@ -44,7 +44,7 @@ Address& Address::operator=(const Address& address) {
+   }
+   structured_address_->CopyFrom(address.GetStructuredAddress());
+   return *this;
+-};
++}
+ 
+ bool Address::operator==(const Address& other) const {
+   if (this == &other)
+diff --git a/components/autofill/core/browser/form_structure.cc b/components/autofill/core/browser/form_structure.cc
+--- a/components/autofill/core/browser/form_structure.cc
++++ b/components/autofill/core/browser/form_structure.cc
+@@ -221,6 +221,7 @@ void EncodeRandomizedValue(const RandomizedEncoder& encoder,
+ //   In that case, use the server prediction instead. In the special case that
+ //   the last specified manual override is a pass through, copy all server
+ //   predictions.
++#if !BUILDFLAG(IS_ANDROID)
+ std::deque<FieldSuggestion> MergeManualAndServerOverrides(
+     std::deque<FieldSuggestion> manual_overrides,
+     std::deque<FieldSuggestion> server_overrides) {
+@@ -246,6 +247,7 @@ std::deque<FieldSuggestion> MergeManualAndServerOverrides(
+ 
+   return result;
+ }
++#endif
+ 
+ void PopulateRandomizedFormMetadata(const RandomizedEncoder& encoder,
+                                     const FormStructure& form,
+diff --git a/components/autofill/core/browser/ui/suggestion_selection.cc b/components/autofill/core/browser/ui/suggestion_selection.cc
+--- a/components/autofill/core/browser/ui/suggestion_selection.cc
++++ b/components/autofill/core/browser/ui/suggestion_selection.cc
+@@ -152,17 +152,7 @@ Suggestion GetFillFullNameSuggestion(Suggestion::BackendId backend_id) {
+ // whole form.
+ // TODO(crbug.com/1459990): Use this once the new popup with submenus
+ // implementation is complete.
+-Suggestion GetFillEverythingFromAddressProfileSuggestion(
+-    Suggestion::BackendId backend_id) {
+-  Suggestion suggestion(l10n_util::GetStringUTF16(
+-      IDS_AUTOFILL_FILL_EVERYTHING_FROM_ADDRESS_PROFILE_POPUP_OPTION_SELECTED));
+-  suggestion.popup_item_id = PopupItemId::kFillEverythingFromAddressProfile;
+-  suggestion.icon = "magicIcon";
+-  suggestion.payload = backend_id;
+-  suggestion.acceptance_a11y_announcement = l10n_util::GetStringUTF16(
+-      IDS_AUTOFILL_A11Y_ANNOUNCE_FILL_EVERYTHING_FROM_ADDRESS_PROFILE_POPUP_OPTION_SELECTED);
+-  return suggestion;
+-}
++// (UAZO) removed due error: unused function
+ 
+ // Append new suggestions to `suggestions` based on the `ServerFieldType` list
+ // provided. Suggestions are not added if their info is not found in the
+diff --git a/components/autofill/core/browser/webdata/autofill_table.cc b/components/autofill/core/browser/webdata/autofill_table.cc
+--- a/components/autofill/core/browser/webdata/autofill_table.cc
++++ b/components/autofill/core/browser/webdata/autofill_table.cc
+@@ -412,12 +412,12 @@ void InsertBuilder(sql::Database* db,
+ }
+ 
+ // Renames the table `from` into `to` and returns true if successful.
+-bool RenameTable(sql::Database* db,
+-                 std::string_view from,
+-                 std::string_view to) {
+-  return db->Execute(
+-      base::StrCat({"ALTER TABLE ", from, " RENAME TO ", to}).c_str());
+-}
++// bool RenameTable(sql::Database* db,
++//                  std::string_view from,
++//                  std::string_view to) {
++//   return db->Execute(
++//       base::StrCat({"ALTER TABLE ", from, " RENAME TO ", to}).c_str());
++// }
+ 
+ // Wrapper around `sql::Database::DoesColumnExist()`, because that function
+ // only accepts const char* parameters.
+diff --git a/components/omnibox/browser/omnibox_field_trial.cc b/components/omnibox/browser/omnibox_field_trial.cc
+--- a/components/omnibox/browser/omnibox_field_trial.cc
++++ b/components/omnibox/browser/omnibox_field_trial.cc
+@@ -1091,11 +1091,11 @@ MLConfig::MLConfig(const MLConfig&) = default;
+ 
+ ScopedMLConfigForTesting::ScopedMLConfigForTesting()
+     : original_config_(std::make_unique<MLConfig>(GetMLConfig())) {
+-  GetMLConfigInternal() = {};
++  //GetMLConfigInternal() = {};
+ }
+ 
+ ScopedMLConfigForTesting::~ScopedMLConfigForTesting() {
+-  GetMLConfigInternal() = *original_config_;
++  //GetMLConfigInternal() = *original_config_;
+ }
+ 
+ MLConfig& ScopedMLConfigForTesting::GetMLConfig() {
+diff --git a/components/safe_browsing/content/renderer/phishing_classifier/phishing_image_embedder.cc b/components/safe_browsing/content/renderer/phishing_classifier/phishing_image_embedder.cc
+--- a/components/safe_browsing/content/renderer/phishing_classifier/phishing_image_embedder.cc
++++ b/components/safe_browsing/content/renderer/phishing_classifier/phishing_image_embedder.cc
+@@ -52,17 +52,9 @@ void PhishingImageEmbedder::BeginImageEmbedding(DoneCallback done_callback) {
+ }
+ 
+ void PhishingImageEmbedder::OnPlaybackDone(std::unique_ptr<SkBitmap> bitmap) {
+-  if (bitmap) {
+-    bitmap_ = std::move(bitmap);
+-    ScorerStorage::GetInstance()
+-        ->GetScorer()
+-        ->ApplyVisualTfLiteModelImageEmbedding(
+-            *bitmap_,
+-            base::BindOnce(&PhishingImageEmbedder::OnImageEmbeddingDone,
+-                           weak_factory_.GetWeakPtr()));
+-  } else {
+-    RunFailureCallback();
+-  }
++  // (UAZO) removed due error:
++  // no member named 'ApplyVisualTfLiteModelImageEmbedding' in 'safe_browsing::Scorer'
++  RunFailureCallback();
+ }
+ 
+ void PhishingImageEmbedder::CancelPendingImageEmbedding() {
+diff --git a/content/browser/browser_interface_binders.cc b/content/browser/browser_interface_binders.cc
+--- a/content/browser/browser_interface_binders.cc
++++ b/content/browser/browser_interface_binders.cc
+@@ -353,6 +353,7 @@ void BindDateTimeChooserForFrame(
+ void BindTextSuggestionHostForFrame(
+     RenderFrameHost* host,
+     mojo::PendingReceiver<blink::mojom::TextSuggestionHost> receiver) {
++  if ((true)) return;
+   auto* view = static_cast<RenderWidgetHostViewAndroid*>(host->GetView());
+   if (!view || !view->text_suggestion_host())
+     return;
+diff --git a/crypto/BUILD.gn b/crypto/BUILD.gn
+--- a/crypto/BUILD.gn
++++ b/crypto/BUILD.gn
+@@ -14,6 +14,9 @@ buildflag_header("buildflags") {
+ }
+ 
+ component("crypto") {
++  # fix error
++  # [chromium-rawptr] Use raw_ptr<T> instead of a raw pointer.
++  configs -= [ "//build/config/clang:find_bad_constructs" ]
+   output_name = "crcrypto"  # Avoid colliding with OpenSSL's libcrypto.
+   sources = [
+     "aead.cc",
+diff --git a/net/BUILD.gn b/net/BUILD.gn
+--- a/net/BUILD.gn
++++ b/net/BUILD.gn
+@@ -1659,6 +1659,7 @@ component("net") {
+     configs -= [ "//build/config/compiler:default_optimization" ]
+     configs += [ "//build/config/compiler:optimize_max" ]
+   }
++  configs -= [ "//build/config/clang:find_bad_constructs" ]
+ }
+ 
+ # net_export.h has its own build target so that code (eg
+diff --git a/third_party/libevent/BUILD.gn b/third_party/libevent/BUILD.gn
+--- a/third_party/libevent/BUILD.gn
++++ b/third_party/libevent/BUILD.gn
+@@ -69,6 +69,8 @@ static_library("libevent") {
+     configs += [ "//build/config/compiler:optimize_max" ]
+   }
+ 
++  configs -= [ "//build/config/clang:find_bad_constructs" ]
++
+   configs -= [ "//build/config/compiler:chromium_code" ]
+   configs += [ "//build/config/compiler:no_chromium_code" ]
+ }
+--
+2.25.1

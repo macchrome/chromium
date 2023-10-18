@@ -1,0 +1,41 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sat, 19 Feb 2022 12:01:33 +0100
+Subject: Disable idle detection
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ content/public/common/content_features.cc                  | 2 +-
+ .../blink/renderer/platform/runtime_enabled_features.json5 | 7 +++----
+ 2 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/content/public/common/content_features.cc b/content/public/common/content_features.cc
+--- a/content/public/common/content_features.cc
++++ b/content/public/common/content_features.cc
+@@ -571,7 +571,7 @@ BASE_FEATURE(kHandleRendererThreadTypeChangesInBrowser,
+ // This is intended as a kill switch for the Idle Detection feature. To enable
+ // this feature, the experimental web platform features flag should be set,
+ // or the site should obtain an Origin Trial token.
+-BASE_FEATURE(kIdleDetection, "IdleDetection", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kIdleDetection, "IdleDetection", base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ // A feature flag for the memory-backed code cache.
+ BASE_FEATURE(kInMemoryCodeCache,
+diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+--- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
++++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+@@ -2048,10 +2048,9 @@
+       base_feature: "none",
+     },
+     {
+-      name: "IdleDetection",
+-      public: true,
+-      status: "stable",
+-      base_feature: "none",
++      name: "IdleDetection",  // disabled
++      public: true,           // by
++      base_feature: "none",   // default
+     },
+     {
+       // TODO(crbug.com/1406358): Remove after the origin trial ends in M113.
+--
+2.25.1

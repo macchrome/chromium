@@ -1,0 +1,133 @@
+From: Serg <serg.zhukovsky@gmail.com>
+Date: Tue, 31 Jan 2017 22:12:27 -0500
+Subject: Add exit menu item
+
+Corrected Exit functionality
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/android/java/res/menu/main_menu.xml                  | 6 ++++++
+ .../org/chromium/chrome/browser/ApplicationLifetime.java    | 2 ++
+ .../org/chromium/chrome/browser/ChromeTabbedActivity.java   | 4 ++++
+ .../src/org/chromium/chrome/browser/app/ChromeActivity.java | 6 ++++++
+ .../chrome/browser/init/ChromeLifetimeController.java       | 6 +++++-
+ .../browser/ui/android/strings/android_chrome_strings.grd   | 3 +++
+ 6 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/android/java/res/menu/main_menu.xml b/chrome/android/java/res/menu/main_menu.xml
+--- a/chrome/android/java/res/menu/main_menu.xml
++++ b/chrome/android/java/res/menu/main_menu.xml
+@@ -163,6 +163,9 @@ found in the LICENSE file.
+         <item android:id="@+id/managed_by_menu_id"
+             android:title="@string/managed_browser"
+             android:icon="@drawable/ic_business" />
++        <item android:id="@+id/exit_id"
++            android:title="@string/menu_exit"
++            android:icon="@drawable/ic_exit_to_app_white_24dp" />
+     </group>
+ 
+     <!-- Items shown only in the tab switcher -->
+@@ -189,6 +192,9 @@ found in the LICENSE file.
+         <item android:id="@id/preferences_id"
+             android:title="@string/menu_settings"
+             android:icon="@drawable/settings_cog" />
++        <item android:id="@+id/exit_id"
++            android:title="@string/menu_exit"
++            android:icon="@drawable/ic_exit_to_app_white_24dp" />
+     </group>
+ 
+     <!-- Items shown only when the tablet has no visible tabs -->
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ApplicationLifetime.java b/chrome/android/java/src/org/chromium/chrome/browser/ApplicationLifetime.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ApplicationLifetime.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ApplicationLifetime.java
+@@ -6,6 +6,7 @@ package org.chromium.chrome.browser;
+ 
+ import org.chromium.base.ObserverList;
+ import org.chromium.base.annotations.CalledByNative;
++import org.chromium.chrome.browser.incognito.IncognitoNotificationManager;
+ 
+ /**
+  * Watches for when Chrome is told to restart itself.
+@@ -42,6 +43,7 @@ public class ApplicationLifetime {
+ 
+     @CalledByNative
+     public static void terminate(boolean restart) {
++        IncognitoNotificationManager.dismissIncognitoNotification();
+         for (Observer observer : sObservers) {
+             observer.onTerminate(restart);
+         }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -230,6 +230,8 @@ import java.util.Locale;
+ import java.util.Set;
+ import java.util.concurrent.atomic.AtomicBoolean;
+ 
++import org.chromium.chrome.browser.ApplicationLifetime;
++
+ /**
+  * This is the main activity for ChromeMobile when not running in document mode.  All the tabs
+  * are accessible via a chrome specific tab switching UI.
+@@ -2203,6 +2205,8 @@ public class ChromeTabbedActivity extends ChromeActivity<ChromeActivityComponent
+         } else if (id == R.id.close_tab) {
+             getCurrentTabModel().closeTab(currentTab, true, false, true);
+             RecordUserAction.record("MobileTabClosed");
++        } else if (id == R.id.exit_id) {
++            ApplicationLifetime.terminate(false);
+         } else if (id == R.id.close_all_tabs_menu_id) {
+             // Close both incognito and normal tabs.
+             CloseAllTabsDialog.show(this, getModalDialogManagerSupplier(),
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+@@ -61,6 +61,7 @@ import org.chromium.chrome.R;
+ import org.chromium.chrome.browser.ActivityTabProvider;
+ import org.chromium.chrome.browser.ActivityUtils;
+ import org.chromium.chrome.browser.AppHooks;
++import org.chromium.chrome.browser.ApplicationLifetime;
+ import org.chromium.chrome.browser.ChromeActivitySessionTracker;
+ import org.chromium.chrome.browser.ChromeApplicationImpl;
+ import org.chromium.chrome.browser.ChromeKeyboardVisibilityDelegate;
+@@ -2403,6 +2404,11 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
+             return true;
+         }
+ 
++        if (id == R.id.exit_id) {
++            ApplicationLifetime.terminate(false);
++            return true;
++        }
++
+         if (id == R.id.update_menu_id) {
+             UpdateMenuItemHelper.getInstance().onMenuItemClicked(this);
+             return true;
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/init/ChromeLifetimeController.java b/chrome/android/java/src/org/chromium/chrome/browser/init/ChromeLifetimeController.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/init/ChromeLifetimeController.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/init/ChromeLifetimeController.java
+@@ -82,7 +82,11 @@ class ChromeLifetimeController implements ApplicationLifetime.Observer,
+ 
+         // Kick off a timer to kill the process after a delay, which fires only if the Activities
+         // take too long to be finished.
+-        mHandler.postDelayed(mRestartRunnable, WATCHDOG_DELAY_MS);
++        if (restart) {
++            mHandler.postDelayed(mRestartRunnable, WATCHDOG_DELAY_MS);
++        } else {
++            fireBrowserRestartActivityIntent();
++        }
+     }
+ 
+     @Override
+diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -3818,6 +3818,9 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
+       <message name="IDS_MENU_AUTO_DARK_WEB_CONTENTS" desc="Menu item in Chrome's overflow/options menu. When Chrome's browser UI is set to dark theme and this option is checked, sites will have a dark theme automatically applied as well. [CHAR_LIMIT=24]">
+         Dark theme
+       </message>
++      <message name="IDS_MENU_EXIT" desc="Menu item for exit browser. [CHAR-LIMIT=27]">
++        Exit
++      </message>
+       <message name="IDS_MENU_READER_MODE_PREFS" desc="Menu item to show reader mode preferences pane, which allows users to change the appearance (font size, theme, etc.) of the page. [CHAR_LIMIT=27]">
+         Appearance
+       </message>
+--
+2.25.1

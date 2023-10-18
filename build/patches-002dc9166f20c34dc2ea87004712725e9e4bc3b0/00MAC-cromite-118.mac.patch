@@ -1,0 +1,142 @@
+--- a/chrome/app/settings_strings.grdp	2023-10-17 10:31:52.099956650 +0000
++++ b/chrome/app/settings_strings.grdp	2023-10-17 10:31:08.551957535 +0000
+@@ -2334,7 +2334,7 @@
+   <message name="IDS_SETTINGS_CLEAR_BROWSING_DATA" desc="Text for clear browsing data button in Privacy options">
+     Clear browsing data
+   </message>
+-  <if expr="is_win">
++  <if expr="is_win or is_linux or is_macosx">
+     <message name="IDS_CLEAR_BROWSING_DATA_ATSTART_TAB_TITLE" desc="The title of the tab showing the at start clear browsing data options.">
+       At Close
+     </message>
+--- a/chrome/browser/chrome_browser_main.cc	2023-10-15 11:30:18.359963294 +0000
++++ b/chrome/browser/chrome_browser_main.cc	2023-10-13 11:53:46.763760374 +0000
+@@ -508,8 +505,8 @@
+       command_line, current_directory, startup_profile_path_info);
+ 
+   // Record now as the last successful chrome start.
+-  if (ShouldRecordActiveUse(command_line))
+-    GoogleUpdateSettings::SetLastRunTime();
++//  if (ShouldRecordActiveUse(command_line))
++//    GoogleUpdateSettings::SetLastRunTime();
+ }
+ #endif  // BUILDFLAG(ENABLE_PROCESS_SINGLETON)
+ 
+@@ -1844,8 +1841,8 @@
+ #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
+ 
+     // Record now as the last successful chrome start.
+-    if (ShouldRecordActiveUse(*base::CommandLine::ForCurrentProcess()))
+-      GoogleUpdateSettings::SetLastRunTime();
++ //   if (ShouldRecordActiveUse(*base::CommandLine::ForCurrentProcess()))
++ //     GoogleUpdateSettings::SetLastRunTime();
+ 
+     // Create the RunLoop for MainMessageLoopRun() to use and transfer
+     // ownership of the browser's lifetime to the BrowserProcess.
+--- a/chrome/browser/chrome_content_browser_client.cc	2023-10-15 11:30:27.135963116 +0000
++++ b/chrome/browser/chrome_content_browser_client.cc	2023-10-13 11:59:10.871751003 +0000
+@@ -2619,12 +2619,12 @@
+     base::CommandLine* command_line,
+     int child_process_id) {
+ #if BUILDFLAG(IS_MAC)
+-  std::unique_ptr<metrics::ClientInfo> client_info =
+-      GoogleUpdateSettings::LoadMetricsClientInfo();
+-  if (client_info) {
+-    command_line->AppendSwitchASCII(switches::kMetricsClientID,
+-                                    client_info->client_id);
+-  }
++//  std::unique_ptr<metrics::ClientInfo> client_info =
++//      GoogleUpdateSettings::LoadMetricsClientInfo();
++//  if (client_info) {
++//    command_line->AppendSwitchASCII(switches::kMetricsClientID,
++//                                    client_info->client_id);
++//  }
+ #elif BUILDFLAG(IS_POSIX)
+ #if BUILDFLAG(IS_ANDROID)
+   bool enable_crash_reporter = true;
+--- a/ui/shell_dialogs/select_file_dialog_mac.mm	2023-10-11 11:19:56.648210246 +0000
++++ b/ui/shell_dialogs/select_file_dialog_mac.mm	2023-10-13 12:02:18.411745581 +0000
+@@ -42,6 +42,10 @@
+   listener_ = nullptr;
+ }
+ 
++void SelectFileDialogImpl::ShowToast(const std::string& message) {
++  // nothing to do, used only on android
++}
++
+ void SelectFileDialogImpl::FileWasSelected(
+     DialogData* dialog_data,
+     bool is_multi,
+--- a/ui/shell_dialogs/select_file_dialog_mac.h	2023-02-18 10:32:56.922443371 +0000
++++ b/ui/shell_dialogs/select_file_dialog_mac.h	2023-10-13 12:04:43.171741396 +0000
+@@ -39,6 +39,8 @@
+   bool IsRunning(gfx::NativeWindow parent_window) const override;
+   void ListenerDestroyed() override;
+ 
++  void ShowToast(const std::string& message) override;
++
+  protected:
+   // SelectFileDialog implementation.
+   // |params| is user data we pass back via the Listener interface.
+--- a/chrome/browser/flag_descriptions.cc	2023-10-16 07:48:30.555987227 +0000
++++ b/chrome/browser/flag_descriptions.cc	2023-10-13 18:48:42.219040610 +0000
+@@ -7685,7 +7668,7 @@
+ 
+ #endif  // defined(TOOLKIT_VIEWS) || BUILDFLAG(IS_ANDROID)
+ 
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+ const char kCTEnabledName[] = "Enable Certificate Transparency";
+ const char kCTEnabledDescription[] =
+     "Enables compliance against the Certificate Transparency Policy, with reporting disabled.";
+@@ -7693,7 +7676,7 @@
+ const char kElasticOverscrollName[] = "Elastic Overscroll";
+ const char kElasticOverscrollDescription[] =
+     "Enables Elastic Overscrolling on touchscreens and precision touchpads.";
+-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+ 
+ #if BUILDFLAG(IS_WIN) ||                                      \
+     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)) || \
+--- a/chrome/browser/flag_descriptions.h	2023-10-16 07:48:30.555987227 +0000
++++ b/chrome/browser/flag_descriptions.h	2023-10-13 12:12:02.263728701 +0000
+@@ -4450,13 +4438,13 @@
+ 
+ #endif  // defined(TOOLKIT_VIEWS) || BUILDFLAG(IS_ANDROID)
+ 
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+ extern const char kCTEnabledName[];
+ extern const char kCTEnabledDescription[];
+ 
+ extern const char kElasticOverscrollName[];
+ extern const char kElasticOverscrollDescription[];
+-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
++#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+ 
+ #if BUILDFLAG(IS_WIN) ||                                      \
+     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)) || \
+--- a/chrome/browser/updater/BUILD.gn	2023-10-15 11:30:24.555963168 +0000
++++ b/chrome/browser/updater/BUILD.gn	2023-10-13 12:14:15.711724843 +0000
+@@ -24,9 +24,9 @@
+ 
+   if (is_mac) {
+     sources += [
+-      "browser_updater_client_mac.mm",
+-      "browser_updater_helper_client_mac.h",
+-      "browser_updater_helper_client_mac.mm",
++  #    "browser_updater_client_mac.mm",
++  #    "browser_updater_helper_client_mac.h",
++  #    "browser_updater_helper_client_mac.mm",
+     ]
+ 
+     if (enable_updater) {
+@@ -38,7 +38,7 @@
+     deps += [
+       "//chrome/app:chromium_strings_grit",
+       "//chrome/app:generated_resources_grit",
+-      "//chrome/browser/google",
++  #    "//chrome/browser/google",
+       "//chrome/common:channel_info",
+       "//chrome/common:chrome_features",
+       "//ui/base",

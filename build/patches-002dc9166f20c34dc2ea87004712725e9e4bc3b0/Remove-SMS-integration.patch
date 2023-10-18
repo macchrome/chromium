@@ -1,0 +1,374 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sun, 3 Nov 2019 08:22:29 +0100
+Subject: Remove SMS integration
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../browser/language/AppLocaleUtils.java      | 42 -----------------
+ .../content/browser/sms/SmsProviderGms.java   | 25 +---------
+ .../browser/sms/SmsUserConsentReceiver.java   | 47 ++-----------------
+ .../browser/sms/SmsVerificationReceiver.java  | 43 ++++-------------
+ .../content/browser/sms/Wrappers.java         | 27 +----------
+ 5 files changed, 15 insertions(+), 169 deletions(-)
+
+diff --git a/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/AppLocaleUtils.java b/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/AppLocaleUtils.java
+--- a/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/AppLocaleUtils.java
++++ b/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/AppLocaleUtils.java
+@@ -117,48 +117,6 @@ public class AppLocaleUtils {
+         return Locale.forLanguageTag("en-US");
+     }
+ 
+-    /**
+-     * Download the language split. If successful set the application language shared preference.
+-     * If set to null the system language will be used.
+-     * @param languageName String BCP-47 code of language to download.
+-     */
+-    public static void setAppLanguagePref(String languageName) {
+-        setAppLanguagePref(languageName, success -> {});
+-    }
+-
+-    /**
+-     * Download the language split using the provided listener for callbacks. If successful set the
+-     * application language shared preference. If called from an APK build where no bundle needs to
+-     * be downloaded the listener's on complete function is immediately called. If languageName is
+-     * null the system language will be used.
+-     * @param languageName String BCP-47 code of language to download.
+-     * @param listener LanguageSplitInstaller.InstallListener to use for callbacks.
+-     */
+-    public static void setAppLanguagePref(
+-            String languageName, LanguageSplitInstaller.InstallListener listener) {
+-        // Wrap the install listener so that on success the app override preference is set.
+-        LanguageSplitInstaller.InstallListener wrappedListener = (success) -> {
+-            if (success) {
+-                if (shouldUseSystemManagedLocale()) {
+-                    setSystemManagedAppLanguage(languageName);
+-                } else {
+-                    SharedPreferencesManager.getInstance().writeString(
+-                            ChromePreferenceKeys.APPLICATION_OVERRIDE_LANGUAGE, languageName);
+-                }
+-            }
+-            listener.onComplete(success);
+-        };
+-
+-        // If this is not a bundle build or the default system language is being used the language
+-        // split should not be installed. Instead indicate that the listener completed successfully
+-        // since the language resources will already be present.
+-        if (!BundleUtils.isBundle() || isFollowSystemLanguage(languageName)) {
+-            wrappedListener.onComplete(true);
+-        } else {
+-            LanguageSplitInstaller.getInstance().installLanguage(languageName, wrappedListener);
+-        }
+-    }
+-
+     /**
+      * Sets the {@link LocaleManager} App language to |languageName|.
+      * TODO(crbug.com/1333981) Move to Android T.
+diff --git a/content/public/android/java/src/org/chromium/content/browser/sms/SmsProviderGms.java b/content/public/android/java/src/org/chromium/content/browser/sms/SmsProviderGms.java
+--- a/content/public/android/java/src/org/chromium/content/browser/sms/SmsProviderGms.java
++++ b/content/public/android/java/src/org/chromium/content/browser/sms/SmsProviderGms.java
+@@ -6,9 +6,6 @@ package org.chromium.content.browser.sms;
+ 
+ import androidx.annotation.VisibleForTesting;
+ 
+-import com.google.android.gms.common.ConnectionResult;
+-import com.google.android.gms.common.GoogleApiAvailability;
+-
+ import org.chromium.base.ContextUtils;
+ import org.chromium.base.Log;
+ import org.chromium.base.ResettersForTesting;
+@@ -44,17 +41,11 @@ public class SmsProviderGms {
+ 
+     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+     public SmsProviderGms(long smsProviderGmsAndroid, @GmsBackend int backend,
+-            boolean isVerificationBackendAvailable) {
++            boolean ignored) {
+         mSmsProviderGmsAndroid = smsProviderGmsAndroid;
+         mBackend = backend;
+         mContext = new Wrappers.WebOTPServiceContext(ContextUtils.getApplicationContext(), this);
+ 
+-        // Creates an mVerificationReceiver regardless of the backend to support requests from
+-        // remote devices.
+-        if (isVerificationBackendAvailable) {
+-            mVerificationReceiver = new SmsVerificationReceiver(this, mContext);
+-        }
+-
+         if (mBackend == GmsBackend.AUTO || mBackend == GmsBackend.USER_CONSENT) {
+             mUserConsentReceiver = new SmsUserConsentReceiver(this, mContext);
+         }
+@@ -86,12 +77,7 @@ public class SmsProviderGms {
+     @CalledByNative
+     private static SmsProviderGms create(long smsProviderGmsAndroid, @GmsBackend int backend) {
+         Log.d(TAG, "Creating SmsProviderGms");
+-        boolean isVerificationBackendAvailable =
+-                GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(
+-                        ContextUtils.getApplicationContext(),
+-                        MIN_GMS_VERSION_NUMBER_WITH_CODE_BROWSER_BACKEND)
+-                == ConnectionResult.SUCCESS;
+-        return new SmsProviderGms(smsProviderGmsAndroid, backend, isVerificationBackendAvailable);
++        return new SmsProviderGms(smsProviderGmsAndroid, backend, false);
+     }
+ 
+     @CalledByNative
+@@ -180,13 +166,6 @@ public class SmsProviderGms {
+     }
+ 
+     public Wrappers.SmsRetrieverClientWrapper getClient() {
+-        if (mClient != null) {
+-            return mClient;
+-        }
+-        mClient = new Wrappers.SmsRetrieverClientWrapper(
+-                mUserConsentReceiver != null ? mUserConsentReceiver.createClient() : null,
+-                mVerificationReceiver != null ? mVerificationReceiver.createClient() : null);
+-
+         return mClient;
+     }
+ 
+diff --git a/content/public/android/java/src/org/chromium/content/browser/sms/SmsUserConsentReceiver.java b/content/public/android/java/src/org/chromium/content/browser/sms/SmsUserConsentReceiver.java
+--- a/content/public/android/java/src/org/chromium/content/browser/sms/SmsUserConsentReceiver.java
++++ b/content/public/android/java/src/org/chromium/content/browser/sms/SmsUserConsentReceiver.java
+@@ -10,13 +10,6 @@ import android.content.Context;
+ import android.content.Intent;
+ import android.content.IntentFilter;
+ 
+-import com.google.android.gms.auth.api.phone.SmsRetriever;
+-import com.google.android.gms.auth.api.phone.SmsRetrieverClient;
+-import com.google.android.gms.common.api.CommonStatusCodes;
+-import com.google.android.gms.common.api.Status;
+-import com.google.android.gms.tasks.OnFailureListener;
+-import com.google.android.gms.tasks.Task;
+-
+ import org.chromium.base.ContextUtils;
+ import org.chromium.base.Log;
+ import org.chromium.ui.base.WindowAndroid;
+@@ -35,30 +28,12 @@ public class SmsUserConsentReceiver extends BroadcastReceiver {
+         mDestroyed = false;
+         mProvider = provider;
+         mContext = context;
+-
+-        // A broadcast receiver is registered upon the creation of this class
+-        // which happens when the SMS Retriever API is used for the first time
+-        // since chrome last restarted (which, on android, happens frequently).
+-        // The broadcast receiver is fairly lightweight (e.g. it responds
+-        // quickly without much computation).
+-        // If this broadcast receiver becomes more heavyweight, we should make
+-        // this registration expire after the SMS message is received.
+-        if (DEBUG) Log.d(TAG, "Registering intent filters.");
+-        IntentFilter filter = new IntentFilter();
+-        filter.addAction(SmsRetriever.SMS_RETRIEVED_ACTION);
+-        ContextUtils.registerExportedBroadcastReceiver(
+-                mContext, this, filter, SmsRetriever.SEND_PERMISSION);
+-    }
+-
+-    public SmsRetrieverClient createClient() {
+-        return SmsRetriever.getClient(mContext);
+     }
+ 
+     public void destroy() {
+         if (mDestroyed) return;
+         if (DEBUG) Log.d(TAG, "Destroying SmsUserConsentReceiver.");
+         mDestroyed = true;
+-        mContext.unregisterReceiver(this);
+     }
+ 
+     @Override
+@@ -69,7 +44,7 @@ public class SmsUserConsentReceiver extends BroadcastReceiver {
+             return;
+         }
+ 
+-        if (!SmsRetriever.SMS_RETRIEVED_ACTION.equals(intent.getAction())) {
++        /*if (!SmsRetriever.SMS_RETRIEVED_ACTION.equals(intent.getAction())) {
+             return;
+         }
+ 
+@@ -103,28 +78,14 @@ public class SmsUserConsentReceiver extends BroadcastReceiver {
+                 if (DEBUG) Log.d(TAG, "Timeout");
+                 mProvider.onTimeout();
+                 break;
+-        }
++        } */
+     }
+ 
+     void onConsentResult(int resultCode, Intent data) {
+-        if (resultCode == Activity.RESULT_OK) {
+-            String message = data.getStringExtra(SmsRetriever.EXTRA_SMS_MESSAGE);
+-            mProvider.onReceive(message, GmsBackend.USER_CONSENT);
+-        } else if (resultCode == Activity.RESULT_CANCELED) {
+-            if (DEBUG) Log.d(TAG, "Activity result cancelled.");
+-            mProvider.onCancel();
+-        }
++        if (DEBUG) Log.d(TAG, "Activity result discarded.");
+     }
+ 
+     public void listen(WindowAndroid windowAndroid) {
+-        Task<Void> task = mProvider.getClient().startSmsUserConsent(null);
+-
+-        task.addOnFailureListener(new OnFailureListener() {
+-            @Override
+-            public void onFailure(Exception e) {
+-                Log.e(TAG, "Task failed to start", e);
+-            }
+-        });
+-        if (DEBUG) Log.d(TAG, "Installed task");
++        if (DEBUG) Log.d(TAG, "Ignored task");
+     }
+ }
+diff --git a/content/public/android/java/src/org/chromium/content/browser/sms/SmsVerificationReceiver.java b/content/public/android/java/src/org/chromium/content/browser/sms/SmsVerificationReceiver.java
+--- a/content/public/android/java/src/org/chromium/content/browser/sms/SmsVerificationReceiver.java
++++ b/content/public/android/java/src/org/chromium/content/browser/sms/SmsVerificationReceiver.java
+@@ -11,16 +11,6 @@ import android.content.Context;
+ import android.content.Intent;
+ import android.content.IntentFilter;
+ 
+-import com.google.android.gms.auth.api.phone.SmsCodeBrowserClient;
+-import com.google.android.gms.auth.api.phone.SmsCodeRetriever;
+-import com.google.android.gms.auth.api.phone.SmsRetriever;
+-import com.google.android.gms.auth.api.phone.SmsRetrieverStatusCodes;
+-import com.google.android.gms.common.api.ApiException;
+-import com.google.android.gms.common.api.CommonStatusCodes;
+-import com.google.android.gms.common.api.ResolvableApiException;
+-import com.google.android.gms.common.api.Status;
+-import com.google.android.gms.tasks.Task;
+-
+ import org.chromium.base.ContextUtils;
+ import org.chromium.base.Log;
+ import org.chromium.base.metrics.RecordHistogram;
+@@ -63,32 +53,14 @@ public class SmsVerificationReceiver extends BroadcastReceiver {
+         // lightweight (e.g. it responds quickly without much computation). If this broadcast
+         // receiver becomes more heavyweight, we should make this registration expire after the SMS
+         // message is received.
+-        if (DEBUG) Log.i(TAG, "Registering intent filters.");
+-        IntentFilter filter = new IntentFilter();
+-        filter.addAction(SmsCodeRetriever.SMS_CODE_RETRIEVED_ACTION);
+-
+-        // The SEND_PERMISSION permission is not documented to held by the sender of this broadcast,
+-        // but it's coming from the same place the UserConsent (SmsRetriever.SMS_RETRIEVED_ACTION)
+-        // broadcast is coming from, so the sender will be holding this permission. This prevents
+-        // other apps from spoofing verification codes.
+-        ContextUtils.registerExportedBroadcastReceiver(
+-                mContext, this, filter, SmsRetriever.SEND_PERMISSION);
+-    }
+-
+-    public SmsCodeBrowserClient createClient() {
+-        return SmsCodeRetriever.getBrowserClient(mContext);
+     }
+ 
+     public void destroy() {
+-        if (mDestroyed) return;
+-        if (DEBUG) Log.d(TAG, "Destroying SmsVerificationReceiver.");
+-        mDestroyed = true;
+-        mContext.unregisterReceiver(this);
+     }
+ 
+     @Override
+     public void onReceive(Context context, Intent intent) {
+-        if (DEBUG) Log.d(TAG, "Received something!");
++        /*if (DEBUG) Log.d(TAG, "Received something!");
+ 
+         if (mDestroyed) {
+             return;
+@@ -121,7 +93,7 @@ public class SmsVerificationReceiver extends BroadcastReceiver {
+                 if (DEBUG) Log.d(TAG, "Timeout");
+                 mProvider.onTimeout();
+                 break;
+-        }
++        }*/
+     }
+ 
+     public void onPermissionDone(int resultCode, boolean isLocalRequest) {
+@@ -141,7 +113,7 @@ public class SmsVerificationReceiver extends BroadcastReceiver {
+      * task.
+      */
+     public void onRetrieverTaskFailure(boolean isLocalRequest, Exception e) {
+-        if (DEBUG) Log.d(TAG, "Task failed. Attempting recovery.", e);
++        /* if (DEBUG) Log.d(TAG, "Task failed. Attempting recovery.", e);
+         ApiException exception = (ApiException) e;
+         if (exception.getStatusCode() == SmsRetrieverStatusCodes.API_NOT_CONNECTED) {
+             reportBackendAvailability(BackendAvailability.API_NOT_CONNECTED);
+@@ -183,12 +155,12 @@ public class SmsVerificationReceiver extends BroadcastReceiver {
+                 }
+             }
+         } else {
+-            Log.w(TAG, "Unexpected exception", e);
+-        }
++            Log.w(TAG, "Unexpected exception", e); // marker
++        } */
+     }
+ 
+     public void listen(boolean isLocalRequest) {
+-        Wrappers.SmsRetrieverClientWrapper client = mProvider.getClient();
++        /* Wrappers.SmsRetrieverClientWrapper client = mProvider.getClient();
+         Task<Void> task = client.startSmsCodeBrowserRetriever();
+ 
+         task.addOnSuccessListener(unused -> {
+@@ -200,7 +172,8 @@ public class SmsVerificationReceiver extends BroadcastReceiver {
+             mProvider.verificationReceiverFailed(isLocalRequest);
+         });
+ 
+-        if (DEBUG) Log.d(TAG, "Installed task");
++        if (DEBUG) Log.d(TAG, "Installed task"); */
++        if (DEBUG) Log.d(TAG, "Ignored task");
+     }
+ 
+     public void reportBackendAvailability(BackendAvailability availability) {
+diff --git a/content/public/android/java/src/org/chromium/content/browser/sms/Wrappers.java b/content/public/android/java/src/org/chromium/content/browser/sms/Wrappers.java
+--- a/content/public/android/java/src/org/chromium/content/browser/sms/Wrappers.java
++++ b/content/public/android/java/src/org/chromium/content/browser/sms/Wrappers.java
+@@ -14,11 +14,6 @@ import android.os.Handler;
+ 
+ import androidx.annotation.RequiresApi;
+ 
+-import com.google.android.gms.auth.api.phone.SmsCodeBrowserClient;
+-import com.google.android.gms.auth.api.phone.SmsCodeRetriever;
+-import com.google.android.gms.auth.api.phone.SmsRetrieverClient;
+-import com.google.android.gms.tasks.Task;
+-
+ class Wrappers {
+     // Prevent instantiation.
+     private Wrappers() {}
+@@ -27,16 +22,9 @@ class Wrappers {
+      * Wraps com.google.android.gms.auth.api.phone.SmsRetrieverClient.
+      */
+     static class SmsRetrieverClientWrapper {
+-        // Used for user consent flow.
+-        private final SmsRetrieverClient mSmsRetrieverClient;
+-        // Used for browser code flow.
+-        private final SmsCodeBrowserClient mSmsCodeBrowserClient;
+         private WebOTPServiceContext mContext;
+ 
+-        public SmsRetrieverClientWrapper(
+-                SmsRetrieverClient smsRetrieverClient, SmsCodeBrowserClient smsCodeBrowserClient) {
+-            mSmsRetrieverClient = smsRetrieverClient;
+-            mSmsCodeBrowserClient = smsCodeBrowserClient;
++        public SmsRetrieverClientWrapper() {
+         }
+ 
+         public void setContext(WebOTPServiceContext context) {
+@@ -46,14 +34,6 @@ class Wrappers {
+         public WebOTPServiceContext getContext() {
+             return mContext;
+         }
+-
+-        public Task<Void> startSmsCodeBrowserRetriever() {
+-            return mSmsCodeBrowserClient.startSmsCodeRetriever();
+-        }
+-
+-        public Task<Void> startSmsUserConsent(String senderAddress) {
+-            return mSmsRetrieverClient.startSmsUserConsent(senderAddress);
+-        }
+     }
+ 
+     /**
+@@ -83,11 +63,6 @@ class Wrappers {
+         }
+ 
+         private void onRegisterReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+-            if (filter.hasAction(SmsCodeRetriever.SMS_CODE_RETRIEVED_ACTION)) {
+-                mVerificationReceiver = receiver;
+-            } else {
+-                mUserConsentReceiver = receiver;
+-            }
+         }
+ 
+         // ---------------------------------------------------------------------
+--
+2.25.1

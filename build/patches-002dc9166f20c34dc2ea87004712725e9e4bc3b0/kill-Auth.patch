@@ -1,0 +1,102 @@
+From: thermatk <thermatk@thermatk.com>
+Date: Fri, 22 Jun 2018 17:06:15 +0200
+Subject: kill Auth
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../signin/SystemAccountManagerDelegate.java  | 49 ++-----------------
+ 1 file changed, 3 insertions(+), 46 deletions(-)
+
+diff --git a/components/signin/public/android/java/src/org/chromium/components/signin/SystemAccountManagerDelegate.java b/components/signin/public/android/java/src/org/chromium/components/signin/SystemAccountManagerDelegate.java
+--- a/components/signin/public/android/java/src/org/chromium/components/signin/SystemAccountManagerDelegate.java
++++ b/components/signin/public/android/java/src/org/chromium/components/signin/SystemAccountManagerDelegate.java
+@@ -25,9 +25,6 @@ import android.os.SystemClock;
+ 
+ import androidx.annotation.Nullable;
+ 
+-import com.google.android.gms.auth.GoogleAuthException;
+-import com.google.android.gms.auth.GoogleAuthUtil;
+-
+ import org.chromium.base.ApiCompatibilityUtils;
+ import org.chromium.base.Callback;
+ import org.chromium.base.ContextUtils;
+@@ -87,14 +84,6 @@ public class SystemAccountManagerDelegate implements AccountManagerDelegate {
+ 
+     @Override
+     public Account[] getAccounts() {
+-        if (hasGetAccountsPermission() && isGooglePlayServicesAvailable()) {
+-            long startTime = SystemClock.elapsedRealtime();
+-            Account[] accounts =
+-                    mAccountManager.getAccountsByType(GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE);
+-            RecordHistogram.recordTimesHistogram("Signin.AndroidGetAccountsTime_AccountManager",
+-                    SystemClock.elapsedRealtime() - startTime);
+-            return accounts;
+-        }
+         // Account seeding relies on GoogleAuthUtil.getAccountId to get GAIA ids,
+         // so don't report any accounts if Google Play Services are out of date.
+         return new Account[] {};
+@@ -105,28 +94,12 @@ public class SystemAccountManagerDelegate implements AccountManagerDelegate {
+             throws AuthException {
+         ThreadUtils.assertOnBackgroundThread();
+         assert AccountUtils.GOOGLE_ACCOUNT_TYPE.equals(account.type);
+-        try {
+-            return new AccessTokenData(GoogleAuthUtil.getTokenWithNotification(
+-                    ContextUtils.getApplicationContext(), account, authTokenScope, null));
+-        } catch (GoogleAuthException ex) {
+-            // This case includes a UserRecoverableNotifiedException, but most clients will have
+-            // their own retry mechanism anyway.
+-            throw new AuthException(AuthException.NONTRANSIENT,
+-                    "Error while getting token for scope '" + authTokenScope + "'", ex);
+-        } catch (IOException ex) {
+-            throw new AuthException(AuthException.TRANSIENT, ex);
+-        }
++        throw new AuthException(AuthException.NONTRANSIENT,
++              "Error while getting token for scope '" + authTokenScope + "'");
+     }
+ 
+     @Override
+     public void invalidateAuthToken(String authToken) throws AuthException {
+-        try {
+-            GoogleAuthUtil.clearToken(ContextUtils.getApplicationContext(), authToken);
+-        } catch (GoogleAuthException ex) {
+-            throw new AuthException(AuthException.NONTRANSIENT, ex);
+-        } catch (IOException ex) {
+-            throw new AuthException(AuthException.TRANSIENT, ex);
+-        }
+     }
+ 
+     @Override
+@@ -163,17 +136,6 @@ public class SystemAccountManagerDelegate implements AccountManagerDelegate {
+     @SuppressLint("MissingPermission")
+     @Override
+     public void createAddAccountIntent(Callback<Intent> callback) {
+-        AccountManagerCallback<Bundle> accountManagerCallback = accountManagerFuture -> {
+-            try {
+-                Bundle bundle = accountManagerFuture.getResult();
+-                callback.onResult(bundle.getParcelable(AccountManager.KEY_INTENT));
+-            } catch (OperationCanceledException | IOException | AuthenticatorException e) {
+-                Log.e(TAG, "Error while creating an intent to add an account: ", e);
+-                callback.onResult(null);
+-            }
+-        };
+-        mAccountManager.addAccount(GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE, null, null, null, null,
+-                accountManagerCallback, null);
+     }
+ 
+     // No permission is needed on 23+ and Chrome always has MANAGE_ACCOUNTS permission on lower APIs
+@@ -206,12 +168,7 @@ public class SystemAccountManagerDelegate implements AccountManagerDelegate {
+     @Nullable
+     @Override
+     public String getAccountGaiaId(String accountEmail) {
+-        try {
+-            return GoogleAuthUtil.getAccountId(ContextUtils.getApplicationContext(), accountEmail);
+-        } catch (IOException | GoogleAuthException ex) {
+-            Log.e(TAG, "SystemAccountManagerDelegate.getAccountGaiaId", ex);
+-            return null;
+-        }
++        return null;
+     }
+ 
+     @Override
+--
+2.25.1

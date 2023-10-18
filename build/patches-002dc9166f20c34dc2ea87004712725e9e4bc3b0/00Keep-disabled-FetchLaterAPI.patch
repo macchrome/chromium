@@ -1,0 +1,23 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Thu, 28 Sep 2023 08:11:00 +0000
+Subject: Keep disabled FetchLaterAPI
+
+---
+ .../blink/renderer/platform/runtime_enabled_features.json5     | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+--- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
++++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+@@ -1693,7 +1693,8 @@
+     },
+     {
+       // The Blink runtime-enabled feature name for the API's IDL.
+-      name: "FetchLaterAPI",
++      name: "FetchLaterAPI",   // disable
++      status: "experimental",  // by default
+       public: true,
+     },
+     {
+--
+2.25.1

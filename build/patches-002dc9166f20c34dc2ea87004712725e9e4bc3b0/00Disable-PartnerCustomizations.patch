@@ -1,0 +1,38 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Tue, 22 Aug 2023 09:02:50 +0000
+Subject: Disable PartnerCustomizations
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/flags/android/chrome_feature_list.cc           | 4 ++--
+ .../partnercustomizations/PartnerBrowserCustomizations.java   | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
+--- a/chrome/browser/flags/android/chrome_feature_list.cc
++++ b/chrome/browser/flags/android/chrome_feature_list.cc
+@@ -912,8 +912,8 @@ BASE_FEATURE(kOpaqueOriginForIncomingIntents,
+              base::FEATURE_ENABLED_BY_DEFAULT);
+ 
+ BASE_FEATURE(kPartnerCustomizationsUma,
+-             "PartnerCustomizationsUma",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             "PartnerCustomizationsUma",          // disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);  // by default
+ BASE_FEATURE(kProbabilisticCryptidRenderer,
+              "ProbabilisticCryptidRenderer",
+              base::FEATURE_DISABLED_BY_DEFAULT);
+diff --git a/chrome/browser/partnercustomizations/java/src/org/chromium/chrome/browser/partnercustomizations/PartnerBrowserCustomizations.java b/chrome/browser/partnercustomizations/java/src/org/chromium/chrome/browser/partnercustomizations/PartnerBrowserCustomizations.java
+--- a/chrome/browser/partnercustomizations/java/src/org/chromium/chrome/browser/partnercustomizations/PartnerBrowserCustomizations.java
++++ b/chrome/browser/partnercustomizations/java/src/org/chromium/chrome/browser/partnercustomizations/PartnerBrowserCustomizations.java
+@@ -214,7 +214,7 @@ public class PartnerBrowserCustomizations {
+                     boolean systemOrPreStable =
+                             (context.getApplicationInfo().flags & ApplicationInfo.FLAG_SYSTEM) == 1
+                             || !VersionInfo.isStableBuild();
+-                    if (!systemOrPreStable) {
++                    if ((true)) {
+                         // Only allow partner customization if this browser is a system package, or
+                         // is in pre-stable channels.
+                         return null;
+--
+2.25.1

@@ -1,0 +1,56 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Tue, 14 Feb 2023 16:26:17 +0000
+Subject: Disable FedCm
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ content/public/common/content_features.cc              | 10 +++++-----
+ .../renderer/platform/runtime_enabled_features.json5   |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/content/public/common/content_features.cc b/content/public/common/content_features.cc
+--- a/content/public/common/content_features.cc
++++ b/content/public/common/content_features.cc
+@@ -418,7 +418,7 @@ BASE_FEATURE(kExperimentalContentSecurityPolicyFeatures,
+ // by the flag in RuntimeEnabledFeatures on the blink side. See also
+ // the use of kSetOnlyIfOverridden in content/child/runtime_features.cc.
+ // We enable it here by default to support use in origin trials.
+-BASE_FEATURE(kFedCm, "FedCm", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kFedCm, "FedCm", base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ // Field trial boolean parameter which indicates whether FedCM IDP sign-out
+ // is enabled.
+@@ -467,15 +467,15 @@ BASE_FEATURE(kFedCmSelectiveDisclosure,
+ // Enables metrics collection for signin status mismatches. Also enables
+ // parsing the signin status HTTP headers.
+ // kFedCmIdpSigninStatusEnabled takes precedence over this feature flag.
+-BASE_FEATURE(kFedCmIdpSigninStatusMetrics,          // disabled
++BASE_FEATURE(kFedCmIdpSigninStatusMetrics,          // enabled
+              "FedCmIdpSigninStatusMetrics",         // by default
+-             base::FEATURE_DISABLED_BY_DEFAULT);    // on bromite
++             base::FEATURE_ENABLED_BY_DEFAULT);     // on bromite
+ 
+ // Enables the IDP signin status API for use with FedCM, including avoiding
+ // network requests when not signed in and mismatch handling.
+-BASE_FEATURE(kFedCmIdpSigninStatusEnabled,          // disabled
++BASE_FEATURE(kFedCmIdpSigninStatusEnabled,          // enabled
+              "FedCmIdpSigninStatusEnabled",         // by default
+-             base::FEATURE_DISABLED_BY_DEFAULT);    // on bromite
++             base::FEATURE_ENABLED_BY_DEFAULT);     // on bromite
+ 
+ // Enables bypassing the well-known file enforcement.
+ BASE_FEATURE(kFedCmWithoutWellKnownEnforcement,
+diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+--- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
++++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+@@ -1596,7 +1596,7 @@
+     {
+       name: "FedCm",
+       public: true,
+-      status: "stable",
++      status: "test",
+       base_feature: "none",
+     },
+     {
+--
+2.25.1

@@ -1,0 +1,252 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Wed, 29 Aug 2018 11:03:44 +0200
+Subject: Add custom tab intents privacy option
+
+Add custom tab intents privacy option and force
+open external links in incognito flag.
+
+Flags are mutually exclusive.
+
+See also: https://github.com/bromite/bromite/issues/1474
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../java/res/xml/privacy_preferences.xml      | 10 ++++++++
+ .../browser/LaunchIntentDispatcher.java       | 21 ++++++++++++++++
+ .../IncognitoCustomTabIntentDataProvider.java |  6 +++++
+ .../privacy/settings/PrivacySettings.java     | 24 +++++++++++++++++++
+ .../flags/android/chrome_feature_list.cc      |  6 ++---
+ .../chrome/browser/tab/TabAssociatedApp.java  |  6 ++++-
+ .../strings/android_chrome_strings.grd        | 14 +++++++++++
+ .../core/common/language_experiments.cc       |  4 ++--
+ 8 files changed, 85 insertions(+), 6 deletions(-)
+
+diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
+--- a/chrome/android/java/res/xml/privacy_preferences.xml
++++ b/chrome/android/java/res/xml/privacy_preferences.xml
+@@ -68,6 +68,16 @@ found in the LICENSE file.
+         android:fragment="org.chromium.chrome.browser.privacy.settings.DoNotTrackSettings"
+         android:key="do_not_track"
+         android:title="@string/do_not_track_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="allow_custom_tab_intents"
++        android:title="@string/allow_custom_tab_intents_title"
++        android:summary="@string/allow_custom_tab_intents_summary"
++        android:defaultValue="false" />
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="open_external_links_incognito"
++        android:title="@string/open_external_links_incognito_title"
++        android:summary="@string/open_external_links_incognito_summary"
++        android:defaultValue="false" />
+     <Preference
+         android:key="privacy_sandbox"
+         android:title="@string/prefs_privacy_sandbox"
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
+@@ -53,6 +53,9 @@ import java.lang.annotation.Retention;
+ import java.lang.annotation.RetentionPolicy;
+ import java.util.Set;
+ 
++import org.chromium.chrome.browser.privacy.settings.PrivacySettings;
++import org.chromium.chrome.browser.tab.TabLaunchType;
++
+ /**
+  * Dispatches incoming intents to the appropriate activity based on the current configuration and
+  * Intent fired.
+@@ -243,6 +246,9 @@ public class LaunchIntentDispatcher implements IntentHandler.IntentHandlerDelega
+      */
+     public static boolean isCustomTabIntent(Intent intent) {
+         if (intent == null) return false;
++        if (!ContextUtils.getAppSharedPreferences()
++                .getBoolean(PrivacySettings.PREF_ALLOW_CUSTOM_TAB_INTENTS, false))
++            return false;
+         if (CustomTabsIntent.shouldAlwaysUseBrowserUI(intent)
+                 || !intent.hasExtra(CustomTabsIntent.EXTRA_SESSION)) {
+             return false;
+@@ -262,6 +268,10 @@ public class LaunchIntentDispatcher implements IntentHandler.IntentHandlerDelega
+         newIntent.setData(uri);
+         newIntent.setClassName(context, CustomTabActivity.class.getName());
+ 
++        if (ContextUtils.getAppSharedPreferences()
++                .getBoolean(PrivacySettings.PREF_OPEN_EXTERNAL_LINKS_INCOGNITO, false))
++            newIntent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_TAB, true);
++
+         // Since configureIntentForResizableCustomTab() might change the componenet/class
+         // associated with the passed intent, it needs to be called after #setClassName(context,
+         // CustomTabActivity.class.getName());
+@@ -408,6 +418,17 @@ public class LaunchIntentDispatcher implements IntentHandler.IntentHandlerDelega
+ 
+         if (Intent.ACTION_VIEW.equals(newIntent.getAction())
+                 && !IntentHandler.wasIntentSenderChrome(newIntent)) {
++
++            if (ContextUtils.getAppSharedPreferences().getBoolean(
++                    PrivacySettings.PREF_OPEN_EXTERNAL_LINKS_INCOGNITO, false)) {
++                Context applicationContext = ContextUtils.getApplicationContext();
++                newIntent = IntentHandler.createTrustedOpenNewTabIntent(applicationContext,
++                    /*incognito*/true);
++                newIntent.setData(mIntent.getData());
++                newIntent.setPackage(applicationContext.getPackageName());
++                IntentHandler.setTabLaunchType(newIntent, TabLaunchType.FROM_EXTERNAL_APP);
++                newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++            }
+             if (!chromeTabbedTaskExists()) {
+                 newIntent.putExtra(IntentHandler.EXTRA_STARTED_TABBED_CHROME_TASK, true);
+             }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/IncognitoCustomTabIntentDataProvider.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/IncognitoCustomTabIntentDataProvider.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/IncognitoCustomTabIntentDataProvider.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/IncognitoCustomTabIntentDataProvider.java
+@@ -38,6 +38,9 @@ import org.chromium.components.browser_ui.widget.TintedDrawable;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
++import org.chromium.base.ContextUtils;
++import org.chromium.chrome.browser.privacy.settings.PrivacySettings;
++
+ /**
+  * A model class that parses the incoming intent for incognito Custom Tabs specific customization
+  * data.
+@@ -113,6 +116,9 @@ public class IncognitoCustomTabIntentDataProvider extends BrowserServicesIntentD
+     }
+ 
+     private static boolean isIntentFromThirdPartyAllowed() {
++        if (ContextUtils.getAppSharedPreferences()
++                        .getBoolean(PrivacySettings.PREF_OPEN_EXTERNAL_LINKS_INCOGNITO, false))
++            return true;
+         return ChromeFeatureList.sCctIncognitoAvailableToThirdParty.isEnabled();
+     }
+ 
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+@@ -103,6 +103,9 @@ public class PrivacySettings extends PreferenceFragmentCompat
+     private HelpAndFeedbackLauncher mHelpAndFeedbackLauncher;
+     private Profile mProfile;
+ 
++    private ChromeSwitchPreference allowCustomTabIntentsPref;
++    private ChromeSwitchPreference openExternalLinksPref;
++
+     @Override
+     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+         getActivity().setTitle(R.string.prefs_privacy_security);
+@@ -246,6 +249,9 @@ public class PrivacySettings extends PreferenceFragmentCompat
+                 new SpanApplier.SpanInfo("<link2>", "</link2>", servicesLink));
+     }
+ 
++    public static final String PREF_ALLOW_CUSTOM_TAB_INTENTS = "allow_custom_tab_intents";
++    public static final String PREF_OPEN_EXTERNAL_LINKS_INCOGNITO = "open_external_links_incognito";
++
+     @Override
+     public boolean onPreferenceChange(Preference preference, Object newValue) {
+         String key = preference.getKey();
+@@ -260,6 +266,14 @@ public class PrivacySettings extends PreferenceFragmentCompat
+         } else if (PREF_SEARCH_SUGGESTIONS.equals(key)) {
+             UserPrefs.get(Profile.getLastUsedRegularProfile())
+                     .setBoolean(Pref.SEARCH_SUGGEST_ENABLED, (boolean) newValue);
++        } else if (PREF_ALLOW_CUSTOM_TAB_INTENTS.equals(key)) {
++            SharedPreferences.Editor sharedPreferencesEditor = ContextUtils.getAppSharedPreferences().edit();
++            sharedPreferencesEditor.putBoolean(PREF_ALLOW_CUSTOM_TAB_INTENTS, (boolean)newValue);
++            sharedPreferencesEditor.apply();
++        } else if (PREF_OPEN_EXTERNAL_LINKS_INCOGNITO.equals(key)) {
++            SharedPreferences.Editor sharedPreferencesEditor = ContextUtils.getAppSharedPreferences().edit();
++            sharedPreferencesEditor.putBoolean(PREF_OPEN_EXTERNAL_LINKS_INCOGNITO, (boolean)newValue);
++            sharedPreferencesEditor.apply();
+         }
+         return true;
+     }
+@@ -283,6 +297,16 @@ public class PrivacySettings extends PreferenceFragmentCompat
+                     UserPrefs.get(mProfile).getBoolean(Pref.CAN_MAKE_PAYMENT_ENABLED));
+         }
+ 
++        allowCustomTabIntentsPref =
++                (ChromeSwitchPreference) findPreference(PREF_ALLOW_CUSTOM_TAB_INTENTS);
++        allowCustomTabIntentsPref.setOnPreferenceChangeListener(this);
++        allowCustomTabIntentsPref.setManagedPreferenceDelegate(mManagedPreferenceDelegate);
++
++        openExternalLinksPref =
++                (ChromeSwitchPreference) findPreference(PREF_OPEN_EXTERNAL_LINKS_INCOGNITO);
++        openExternalLinksPref.setOnPreferenceChangeListener(this);
++        openExternalLinksPref.setManagedPreferenceDelegate(mManagedPreferenceDelegate);
++
+         Preference doNotTrackPref = findPreference(PREF_DO_NOT_TRACK);
+         if (doNotTrackPref != null) {
+             doNotTrackPref.setSummary(UserPrefs.get(mProfile).getBoolean(Pref.ENABLE_DO_NOT_TRACK)
+diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
+--- a/chrome/browser/flags/android/chrome_feature_list.cc
++++ b/chrome/browser/flags/android/chrome_feature_list.cc
+@@ -580,8 +580,8 @@ BASE_FEATURE(kCCTIncognitoAvailableToThirdParty,
+              base::FEATURE_ENABLED_BY_DEFAULT);             // in Bromite
+ 
+ BASE_FEATURE(kCCTIntentFeatureOverrides,
+-             "CCTIntentFeatureOverrides",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             "CCTIntentFeatureOverrides",                   // must be disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);            // in Bromite
+ 
+ BASE_FEATURE(kCCTMinimized, "CCTMinimized", base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+@@ -591,7 +591,7 @@ BASE_FEATURE(kCCTPageInsightsHub,
+ 
+ BASE_FEATURE(kCCTPostMessageAPI,
+              "CCTPostMessageAPI",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ BASE_FEATURE(kCCTPrefetchDelayShowOnStart,
+              "CCTPrefetchDelayShowOnStart",
+diff --git a/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/TabAssociatedApp.java b/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/TabAssociatedApp.java
+--- a/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/TabAssociatedApp.java
++++ b/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/TabAssociatedApp.java
+@@ -84,7 +84,11 @@ public final class TabAssociatedApp extends TabWebContentsUserData implements Im
+     public static boolean isOpenedFromExternalApp(Tab tab) {
+         TabAssociatedApp app = get(tab);
+         if (app == null) return false;
+-
++        if (ContextUtils.getAppSharedPreferences()
++                        .getBoolean("open_external_links_incognito", false) &&
++                tab.isIncognito() &&
++                tab.getLaunchType() == TabLaunchType.FROM_EXTERNAL_APP)
++            return true;
+         String packageName = ContextUtils.getApplicationContext().getPackageName();
+         return tab.getLaunchType() == TabLaunchType.FROM_EXTERNAL_APP
+                 && !TextUtils.equals(app.getAppId(), packageName);
+diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -5182,6 +5182,20 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
+       <message name="IDS_NEAR_OOM_INTERVENTION_DECLINE" desc="The text of the button letting the user decline the browser's intervention, so that the page can resume what it was doing.">
+          Resume
+       </message>
++      <!-- Allow custom tab intents -->
++      <message name="IDS_ALLOW_CUSTOM_TAB_INTENTS_TITLE" desc="Text for 'Allow custom tab intents' settings-privacy option.">
++        Allow custom tab intents
++      </message>
++      <message name="IDS_ALLOW_CUSTOM_TAB_INTENTS_SUMMARY" desc="Summary text for 'Allow custom tab intents' settings-privacy option.">
++        Allow applications to open custom tab intents, similar to webview.
++      </message>
++      <!-- Open External Links in Incognito -->
++      <message name="IDS_OPEN_EXTERNAL_LINKS_INCOGNITO_TITLE" desc="Text for 'Open external links in incognito' settings-privacy option.">
++        Open external links in incognito
++      </message>
++      <message name="IDS_OPEN_EXTERNAL_LINKS_INCOGNITO_SUMMARY" desc="Summary text for 'Open external links in incognito' settings-privacy option.">
++        Force the opening of all external links in incognito mode
++      </message>
+       <!-- Usage Stats strings -->
+       <message name="IDS_USAGE_STATS_CONSENT_TITLE" desc="Title for activity authorizing Digital Wellbeing to access Chrome usage data">
+         Show your Chrome activity in Digital Wellbeing?
+diff --git a/components/language/core/common/language_experiments.cc b/components/language/core/common/language_experiments.cc
+--- a/components/language/core/common/language_experiments.cc
++++ b/components/language/core/common/language_experiments.cc
+@@ -18,8 +18,8 @@ BASE_FEATURE(kContentLanguagesInLanguagePicker,
+              "ContentLanguagesInLanguagePicker",
+              base::FEATURE_DISABLED_BY_DEFAULT);
+ BASE_FEATURE(kCctAutoTranslate,
+-             "CCTAutoTranslate",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             "CCTAutoTranslate",                  // Always disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);  // in Bromite
+ 
+ // Params:
+ const char kContentLanguagesDisableObserversParam[] = "disable_observers";
+--
+2.25.1

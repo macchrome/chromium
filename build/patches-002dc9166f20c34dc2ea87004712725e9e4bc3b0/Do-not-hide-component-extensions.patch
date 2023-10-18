@@ -1,0 +1,24 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Thu, 12 Oct 2017 08:09:24 +0200
+Subject: Do not hide component extensions
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ extensions/browser/api/management/management_api.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/extensions/browser/api/management/management_api.cc b/extensions/browser/api/management/management_api.cc
+--- a/extensions/browser/api/management/management_api.cc
++++ b/extensions/browser/api/management/management_api.cc
+@@ -75,7 +75,8 @@ AutoConfirmForTest auto_confirm_for_test = DO_NOT_SKIP;
+ // Returns true if the extension should be exposed via the chrome.management
+ // API.
+ bool ShouldExposeViaManagementAPI(const Extension& extension) {
+-  return !Manifest::IsComponentLocation(extension.location());
++  // do not hide component extensions
++  return true;
+ }
+ 
+ std::vector<std::string> CreateWarningsList(const Extension* extension) {
+--
+2.25.1

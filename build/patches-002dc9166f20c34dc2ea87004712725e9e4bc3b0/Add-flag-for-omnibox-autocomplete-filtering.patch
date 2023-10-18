@@ -1,0 +1,139 @@
+From: Blaise <BlaiseD@GMail.com>
+Date: Sat, 22 Aug 2020 08:52:40 -0500
+Subject: Add flag for omnibox autocomplete filtering
+
+Adds a flag that restricts whether search history, clipboard, bookmarks
+and internal chrome:// pages will be used for the autocomplete results.
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/browser/about_flags.cc                 | 22 ++++++++++++++++++-
+ .../browser/autocomplete_controller.cc        | 10 +++++++++
+ .../omnibox/browser/history_url_provider.cc   |  3 +++
+ components/omnibox/browser/search_provider.cc |  4 ++++
+ components/url_formatter/url_fixer.cc         |  4 ++++
+ 5 files changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -604,6 +604,22 @@ const FeatureEntry::FeatureVariation kReaderModeDiscoverabilityVariations[] = {
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+ #if BUILDFLAG(IS_ANDROID)
++const FeatureEntry::Choice kOmniboxAutocompleteFiltering[] = {
++    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
++    {"Search suggestions only",
++     "omnibox-autocomplete-filtering",
++     "search"},
++    {"Search suggestions and bookmarks",
++     "omnibox-autocomplete-filtering",
++     "search-bookmarks"},
++    {"Search suggestions and internal chrome pages",
++     "omnibox-autocomplete-filtering",
++     "search-chrome"},
++    {"Search suggestions, bookmarks, and internal chrome pages",
++     "omnibox-autocomplete-filtering",
++     "search-bookmarks-chrome"},
++};
++
+ const FeatureEntry::FeatureParam kAdaptiveButton_AlwaysNone[] = {
+     {"mode", "always-none"}};
+ const FeatureEntry::FeatureParam kAdaptiveButton_AlwaysNewTab[] = {
+@@ -4714,7 +4730,11 @@ const FeatureEntry kFeatureEntries[] = {
+      kOsMac | kOsLinux | kOsWin,
+      FEATURE_VALUE_TYPE(features::kSystemNotifications)},
+ #endif  // BUILDFLAG(ENABLE_SYSTEM_NOTIFICATIONS) && !BUILDFLAG(IS_CHROMEOS_ASH)
+-#if BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_ANDROID) // Bromite autocomplete filtering
++    {"omnibox-autocomplete-filtering",
++     "Omnibox Autocomplete Filtering",
++     "Restrict omnibox autocomplete results to a combination of search suggestions (if enabled), bookmarks, and internal chrome pages.",
++     kOsAll, MULTI_VALUE_TYPE(kOmniboxAutocompleteFiltering)},
+     {"adaptive-button-in-top-toolbar",
+      flag_descriptions::kAdaptiveButtonInTopToolbarName,
+      flag_descriptions::kAdaptiveButtonInTopToolbarDescription, kOsAndroid,
+diff --git a/components/omnibox/browser/autocomplete_controller.cc b/components/omnibox/browser/autocomplete_controller.cc
+--- a/components/omnibox/browser/autocomplete_controller.cc
++++ b/components/omnibox/browser/autocomplete_controller.cc
+@@ -18,6 +18,7 @@
+ #include "base/barrier_callback.h"
+ #include "base/check_op.h"
+ #include "base/containers/contains.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/format_macros.h"
+ #include "base/functional/bind.h"
+@@ -368,6 +369,15 @@ AutocompleteController::AutocompleteController(
+           provider_client_->GetOmniboxTriggeredFeatureService()),
+       steady_state_omnibox_position_(
+           metrics::OmniboxEventProto::UNKNOWN_POSITION) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch("omnibox-autocomplete-filtering")) {
++    const std::string flag_value = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("omnibox-autocomplete-filtering");
++    provider_types &= AutocompleteProvider::TYPE_KEYWORD | AutocompleteProvider::TYPE_SEARCH |
++        AutocompleteProvider::TYPE_HISTORY_URL | AutocompleteProvider::TYPE_BOOKMARK | AutocompleteProvider::TYPE_BUILTIN;
++    if (!base::Contains(flag_value, "bookmarks"))
++      provider_types &= ~AutocompleteProvider::TYPE_BOOKMARK;
++    if (!base::Contains(flag_value, "chrome"))
++      provider_types &= ~AutocompleteProvider::TYPE_BUILTIN;
++  }
+   provider_types &= ~OmniboxFieldTrial::GetDisabledProviderTypes();
+ 
+   // Providers run in the order they're added. Async providers should run first
+diff --git a/components/omnibox/browser/history_url_provider.cc b/components/omnibox/browser/history_url_provider.cc
+--- a/components/omnibox/browser/history_url_provider.cc
++++ b/components/omnibox/browser/history_url_provider.cc
+@@ -478,6 +478,9 @@ void HistoryURLProvider::Start(const AutocompleteInput& input,
+   if (fixed_up_input.type() != metrics::OmniboxInputType::QUERY)
+     matches_.push_back(what_you_typed_match);
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch("omnibox-autocomplete-filtering"))
++    return;
++
+   // We'll need the history service to run both passes, so try to obtain it.
+   history::HistoryService* const history_service =
+       client()->GetHistoryService();
+diff --git a/components/omnibox/browser/search_provider.cc b/components/omnibox/browser/search_provider.cc
+--- a/components/omnibox/browser/search_provider.cc
++++ b/components/omnibox/browser/search_provider.cc
+@@ -12,6 +12,7 @@
+ #include "base/base64.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
++#include "base/command_line.h"
+ #include "base/functional/callback.h"
+ #include "base/i18n/break_iterator.h"
+ #include "base/i18n/case_conversion.h"
+@@ -649,6 +650,9 @@ void SearchProvider::Run(bool query_is_private) {
+ }
+ 
+ void SearchProvider::DoHistoryQuery(bool minimal_changes) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch("omnibox-autocomplete-filtering"))
++    return;
++
+   // The history query results are synchronous, so if minimal_changes is true,
+   // we still have the last results and don't need to do anything.
+   if (minimal_changes)
+diff --git a/components/url_formatter/url_fixer.cc b/components/url_formatter/url_fixer.cc
+--- a/components/url_formatter/url_fixer.cc
++++ b/components/url_formatter/url_fixer.cc
+@@ -7,6 +7,8 @@
+ #include <stddef.h>
+ 
+ #include "base/check_op.h"
++#include "base/containers/contains.h"
++#include "base/command_line.h"
+ #include "base/files/file_path.h"
+ #include "base/files/file_util.h"
+ #include "base/i18n/char_iterator.h"
+@@ -608,6 +610,8 @@ GURL FixupURL(const std::string& text, const std::string& desired_tld) {
+ 
+     FixupHost(trimmed, parts.host, parts.scheme.is_valid(), desired_tld, &url);
+     if (chrome_url && !parts.host.is_valid())
++     if (!base::CommandLine::ForCurrentProcess()->HasSwitch("omnibox-autocomplete-filtering") ||
++         base::Contains(base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("omnibox-autocomplete-filtering"), "chrome"))
+       url.append(kChromeUIDefaultHost);
+     FixupPort(trimmed, parts.port, &url);
+     FixupPath(trimmed, parts.path, &url);
+--
+2.25.1

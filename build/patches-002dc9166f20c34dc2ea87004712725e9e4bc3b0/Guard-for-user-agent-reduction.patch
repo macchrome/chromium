@@ -1,0 +1,105 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Mon, 10 Feb 2020 23:13:13 +0100
+Subject: Guard for user-agent reduction
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/browser/chrome_content_browser_client.cc  |  2 +-
+ content/common/user_agent.cc                     | 13 +++++--------
+ third_party/blink/common/features.cc             |  4 ++--
+ .../platform/runtime_enabled_features.json5      | 16 ++++++++--------
+ 4 files changed, 16 insertions(+), 19 deletions(-)
+
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -1650,7 +1650,7 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
+   registry->RegisterIntegerPref(
+       prefs::kUserAgentReduction,
+       static_cast<int>(
+-          embedder_support::UserAgentReductionEnterprisePolicyState::kDefault));
++          embedder_support::UserAgentReductionEnterprisePolicyState::kForceEnabled));
+   registry->RegisterBooleanPref(prefs::kOriginAgentClusterDefaultEnabled, true);
+   registry->RegisterBooleanPref(
+       policy::policy_prefs::kIsolatedAppsDeveloperModeAllowed, true);
+diff --git a/content/common/user_agent.cc b/content/common/user_agent.cc
+--- a/content/common/user_agent.cc
++++ b/content/common/user_agent.cc
+@@ -347,14 +347,7 @@ std::string BuildUserAgentFromProduct(const std::string& product) {
+ }
+ 
+ std::string BuildModelInfo() {
+-  std::string model;
+-#if BUILDFLAG(IS_ANDROID)
+-  // Only send the model information if on the release build of Android,
+-  // matching user agent behaviour.
+-  if (base::SysInfo::GetAndroidBuildCodename() == "REL")
+-    model = base::SysInfo::HardwareModelName();
+-#endif
+-  return model;
++  return std::string();
+ }
+ 
+ #if BUILDFLAG(IS_ANDROID)
+@@ -375,6 +368,10 @@ std::string GetAndroidOSInfo(
+     IncludeAndroidModel include_android_model) {
+   std::string android_info_str;
+ 
++  // Do not send information about the device.
++  include_android_model = IncludeAndroidModel::Exclude;
++  include_android_build_number = IncludeAndroidBuildNumber::Exclude;
++
+   // Send information about the device.
+   bool semicolon_inserted = false;
+   if (include_android_model == IncludeAndroidModel::Include) {
+diff --git a/third_party/blink/common/features.cc b/third_party/blink/common/features.cc
+--- a/third_party/blink/common/features.cc
++++ b/third_party/blink/common/features.cc
+@@ -1449,8 +1449,8 @@ BASE_FEATURE(kReducedReferrerGranularity,
+ const base::FeatureParam<std::string> kUserAgentFrozenBuildVersion{
+     &kReduceUserAgentMinorVersion, "build_version", "0"};
+ 
+-const base::FeatureParam<bool> kAllExceptLegacyWindowsPlatform = {
+-    &kReduceUserAgentPlatformOsCpu, "all_except_legacy_windows_platform", true};
++const base::FeatureParam<bool> kAllExceptLegacyWindowsPlatform = {                 // must be enabled
++    &kReduceUserAgentPlatformOsCpu, "all_except_legacy_windows_platform", true};   // in Bromite
+ const base::FeatureParam<bool> kLegacyWindowsPlatform = {
+     &kReduceUserAgentPlatformOsCpu, "legacy_windows_platform", true};
+ 
+diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+--- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
++++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+@@ -3039,23 +3039,23 @@
+       // If enabled, the deviceModel will be reduced to "K" and the
+       // androidVersion will be reduced to a static "10" string in android
+       // User-Agent string.
+-      name: "ReduceUserAgentAndroidVersionDeviceModel",
+-      depends_on: ["ReduceUserAgentMinorVersion"],
+-      status: {"Android": "stable"},
++      name: "ReduceUserAgentAndroidVersionDeviceModel",   // keep
++      depends_on: ["ReduceUserAgentMinorVersion"],        // enabled
++      status: {"Android": "stable"},                      // in bromite
+     },
+     // If enabled, the minor version of the User-Agent string will be reduced.
+     // This User-Agent Reduction feature has been enabled starting from M101,
+     // but we still keep this flag for future phase tests.
+     {
+-      name: "ReduceUserAgentMinorVersion",
+-      status: "stable",
++      name: "ReduceUserAgentMinorVersion",                // keep enabled
++      status: "stable",                                   // in bromite
+     },
+     {
+       // If enabled, the platform and oscpu of the User-Agent string will be
+       // reduced.
+-      name: "ReduceUserAgentPlatformOsCpu",
+-      depends_on: ["ReduceUserAgentMinorVersion"],
+-      status: {"Android": "", "default": "stable"},
++      name: "ReduceUserAgentPlatformOsCpu",               // keep
++      depends_on: ["ReduceUserAgentMinorVersion"],        // enabled
++      status: {"Android": "", "default": "stable"},       // in bromite
+     },
+     {
+       name: "RegionCapture",
+--
+2.25.1

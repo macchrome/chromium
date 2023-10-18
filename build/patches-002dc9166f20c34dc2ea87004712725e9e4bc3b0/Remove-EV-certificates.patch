@@ -1,0 +1,61 @@
+From: Jan Engelhardt <jengelh@inai.de>
+Date: Thu, 2 Apr 2015 12:44:23 +0200
+Subject: Remove EV certificates
+
+The team chose to let EV certificates appear just like normal
+certificates. The web of trust is considered a failure in itself, so
+do not give users a false sense of extra security with EV certs.
+Instead, let them appear just like regular ones.
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ net/cert/ev_root_ca_metadata.cc | 15 +++++++++++++--
+ net/cert/ev_root_ca_metadata.h  |  2 +-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/net/cert/ev_root_ca_metadata.cc b/net/cert/ev_root_ca_metadata.cc
+--- a/net/cert/ev_root_ca_metadata.cc
++++ b/net/cert/ev_root_ca_metadata.cc
+@@ -36,7 +36,19 @@ struct EVMetadata {
+   const base::StringPiece policy_oids[kMaxOIDsPerCA];
+ };
+ 
+-#include "net/data/ssl/chrome_root_store/chrome-ev-roots-inc.cc"
++static const EVMetadata kEvRootCaMetadata[] = {
++    // need some dummy data to make compiler happy, because
++    // arraysize() is implemented as a convoluted template rather than
++    // the traditional sizeof(x)/sizeof(*x)
++    {
++       {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
++        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
++        {
++            "1.3.159.1.17.1",
++            "",
++        },
++    }
++};
+ 
+ #endif  // defined(PLATFORM_USES_CHROMIUM_EV_METADATA)
+ }  // namespace
+@@ -116,7 +128,6 @@ bool EVRootCAMetadata::RemoveEVCA(const SHA256HashValue& fingerprint) {
+ //
+ 
+ bool EVRootCAMetadata::IsEVPolicyOID(der::Input policy_oid) const {
+-  LOG(WARNING) << "Not implemented";
+   return false;
+ }
+ 
+diff --git a/net/cert/ev_root_ca_metadata.h b/net/cert/ev_root_ca_metadata.h
+--- a/net/cert/ev_root_ca_metadata.h
++++ b/net/cert/ev_root_ca_metadata.h
+@@ -20,7 +20,7 @@
+     BUILDFLAG(IS_FUCHSIA)
+ // When not defined, the EVRootCAMetadata singleton is a dumb placeholder
+ // implementation that will fail all EV lookup operations.
+-#define PLATFORM_USES_CHROMIUM_EV_METADATA
++//#define PLATFORM_USES_CHROMIUM_EV_METADATA
+ #endif
+ 
+ namespace base {
+--
+2.25.1

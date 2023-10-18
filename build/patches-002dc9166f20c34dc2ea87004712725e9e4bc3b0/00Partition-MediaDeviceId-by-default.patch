@@ -1,0 +1,29 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Thu, 28 Sep 2023 07:56:11 +0000
+Subject: Partition MediaDeviceId by default
+
+---
+ components/media_device_salt/media_device_salt_service.cc | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/components/media_device_salt/media_device_salt_service.cc b/components/media_device_salt/media_device_salt_service.cc
+--- a/components/media_device_salt/media_device_salt_service.cc
++++ b/components/media_device_salt/media_device_salt_service.cc
+@@ -23,11 +23,11 @@
+ namespace media_device_salt {
+ 
+ BASE_FEATURE(kMediaDeviceIdPartitioning,
+-             "MediaDeviceIdPartitioning",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             "MediaDeviceIdPartitioning",             // keep
++             base::FEATURE_ENABLED_BY_DEFAULT);       // enabled
+ BASE_FEATURE(kMediaDeviceIdRandomSaltsPerStorageKey,
+-             "MediaDeviceIdRandomSaltsPerStorageKey",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++             "MediaDeviceIdRandomSaltsPerStorageKey", // enabled
++             base::FEATURE_ENABLED_BY_DEFAULT);       // by default
+ 
+ namespace {
+ 
+--
+2.25.1

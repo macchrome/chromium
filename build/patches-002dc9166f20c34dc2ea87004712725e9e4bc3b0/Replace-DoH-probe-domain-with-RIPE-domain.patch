@@ -1,0 +1,38 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sun, 27 Oct 2019 10:00:13 +0100
+Subject: Replace DoH probe domain with RIPE domain
+
+Replace known good hostname
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/browser/net/dns_probe_runner.cc | 2 +-
+ net/dns/dns_transaction.h              | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/net/dns_probe_runner.cc b/chrome/browser/net/dns_probe_runner.cc
+--- a/chrome/browser/net/dns_probe_runner.cc
++++ b/chrome/browser/net/dns_probe_runner.cc
+@@ -18,7 +18,7 @@
+ 
+ namespace chrome_browser_net {
+ 
+-const char DnsProbeRunner::kKnownGoodHostname[] = "google.com";
++const char DnsProbeRunner::kKnownGoodHostname[] = "www.ripe.net";
+ 
+ namespace {
+ 
+diff --git a/net/dns/dns_transaction.h b/net/dns/dns_transaction.h
+--- a/net/dns/dns_transaction.h
++++ b/net/dns/dns_transaction.h
+@@ -29,7 +29,7 @@ class NetLogWithSource;
+ class ResolveContext;
+ 
+ // The hostname probed by CreateDohProbeRunner().
+-inline constexpr base::StringPiece kDohProbeHostname = "www.gstatic.com";
++inline constexpr base::StringPiece kDohProbeHostname = "www.ripe.net";
+ 
+ // DnsTransaction implements a stub DNS resolver as defined in RFC 1034.
+ // The DnsTransaction takes care of retransmissions, name server fallback (or
+--
+2.25.1

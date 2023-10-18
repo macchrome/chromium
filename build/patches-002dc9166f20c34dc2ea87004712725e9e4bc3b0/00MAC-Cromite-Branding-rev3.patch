@@ -1,0 +1,125 @@
+diff --git a/chrome/app/extensions_strings.grdp b/chrome/app/extensions_strings.grdp
+--- a/chrome/app/extensions_strings.grdp
++++ b/chrome/app/extensions_strings.grdp
+@@ -368,7 +368,7 @@
+     No recent activities
+   </message>
+   <message name="IDS_EXTENSIONS_NO_INSTALLED_ITEMS" desc="The message shown to the user on the Extensions settings page when there are no extensions or apps installed.">
+-    Find extensions and themes in the <ph name="BEGIN_LINK">&lt;a target="_blank" href="https://chrome.google.com/webstore/category/extensions"&gt;</ph>Chrome Web Store<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph>
++    Find extensions and themes in the <ph name="BEGIN_LINK">&lt;a target="_blank" href="https://chrome.google.com/webstore/category/extensions"&gt;</ph>Chromedontreplace Web Store<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph>
+   </message>
+   <message name="IDS_EXTENSIONS_NO_DESCRIPTION" desc="The message shown to the user when an extension does not have any description.">
+     No description provided
+@@ -503,7 +503,7 @@
+     My extensions
+   </message>
+   <message name="IDS_EXTENSIONS_SIDEBAR_DISCOVER_MORE" desc="The text displayed in the sidebar to open the Chrome Web Store to get more extensions.">
+-    Discover more extensions and themes on the <ph name="BEGIN_LINK">&lt;a target="_blank" href="$1"&gt;</ph>Chrome Web Store<ph name="END_LINK">&lt;/a&gt; <ex>&lt;/a&gt;</ex> </ph>
++    Discover more extensions and themes on the <ph name="BEGIN_LINK">&lt;a target="_blank" href="$1"&gt;</ph>Chromedontreplace Web Store<ph name="END_LINK">&lt;/a&gt; <ex>&lt;/a&gt;</ex> </ph>
+   </message>
+   <message name="IDS_EXTENSIONS_SIDEBAR_KEYBOARD_SHORTCUTS" desc="The text for the link to manage keyboard shortcuts for extensions.">
+     Keyboard shortcuts
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -263,7 +263,7 @@
+     Change
+   </message>
+   <message name="IDS_SETTINGS_WEB_STORE" desc="Sub-label about choosing something from the Chrome Web Store.">
+-    Open Chrome Web Store
++    Open Chromedontreplace Web Store
+   </message>
+   <if expr="is_macosx">
+     <message name="IDS_SETTINGS_TABS_TO_LINKS_PREF" desc="The documentation string of the 'Tabs to Links' preference">
+diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+@@ -31,9 +31,10 @@
+       }
+ 
+       #aboutIcon {
+-        --cr-icon-image: url(//resources/images/chrome_logo_dark.svg);
++        background: url('chrome://theme/current-channel-logo@1x');
++        background-size: 20px 20px;
++        filter: grayscale();
+         -webkit-mask-size: 18px;
+-        background-color: var(--iron-icon-fill-color);
+         display: block;
+         height: var(--cr-icon-size);
+         margin-inline-end: 20px;
+        Application version
+diff --git a/chrome/common/url_constants.cc b/chrome/common/url_constants.cc
+--- a/chrome/common/url_constants.cc
++++ b/chrome/common/url_constants.cc
+@@ -79,7 +79,7 @@ const char kChromeHelpViaMenuURL[] =
+ #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+ 
+ const char kChromeHelpViaWebUIURL[] =
+-    "https://support.google.com/chrome/?p=help&ctx=settings";
++    "https://github.com/uazo/bromite-buildtools/issues";
+ #if BUILDFLAG(IS_CHROMEOS_ASH)
+ const char kChromeOsHelpViaWebUIURL[] =
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+@@ -109,7 +109,7 @@ const char kChromeSearchScheme[] = "chrome-search";
+ const char kChromeUIUntrustedNewTabPageUrl[] =
+     "chrome-untrusted://new-tab-page/";
+ 
+-const char kChromiumProjectURL[] = "https://www.chromium.org/";
++const char kChromiumProjectURL[] = "https://github.com/uazo/bromite-buildtools/";
+ 
+ const char kContentSettingsExceptionsLearnMoreURL[] =
+     "https://support.google.com/chrome/?p=settings_manage_exceptions";
+        Text scaling
+
+diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
+--- a/tools/grit/grit/grd_reader.py
++++ b/tools/grit/grit/grd_reader.py
+@@ -126,6 +126,7 @@ class GrdContentHandler(xml.sax.handler.ContentHandler):
+   def characters(self, content):
+     if self.ignore_depth == 0:
+       if self.stack[-1]:
++        content = self.replace_browser(content)
+         self.stack[-1].AppendContent(content)
+ 
+   def ignorableWhitespace(self, whitespace):
+@@ -133,6 +134,40 @@ class GrdContentHandler(xml.sax.handler.ContentHandler):
+     # parser?
+     pass
+ 
++  def replace_browser(self, content_orig):
++    content = content_orig.replace("Chromiumdontreplace", "zzzyyyyxxxx1")
++    content = content.replace("Chromedontreplace", "zzzyyyyxxxx2")
++    content = content.replace("chromedontreplace", "zzzyyyyxxxx3")
++    content = content.replace("//chrome", "zzzyyyyxxxx4")
++    content = content.replace("chrome://", "zzzyyyyxxxx5")
++    content = content.replace("/chrome/", "zzzyyyyxxxx6")
++    content = content.replace("chrome_", "zzzyyyyxxxx7")
++    content = content.replace(".chromium.org", "zzzyyyyxxxx8")
++    content = content.replace("chromebook", "zzzyyyyxxxx9")
++    content = content.replace("chromeos", "zzzyyyyxxxxA")
++
++    content = content.replace("google chrome", "cromite")
++    content = content.replace("Chrome", "Cromite")
++    content = content.replace("Chromium", "Cromite")
++    content = content.replace("Bromite", "Cromite")
++    content = content.replace("chrome", "cromite")
++    content = content.replace("chromium", "cromite")
++    content = content.replace("bromite", "cromite")
++
++    content = content.replace("zzzyyyyxxxx1", "Chromium")
++    content = content.replace("zzzyyyyxxxx2", "Chrome")
++    content = content.replace("zzzyyyyxxxx3", "chrome")
++    content = content.replace("zzzyyyyxxxx4", "//chrome")
++    content = content.replace("zzzyyyyxxxx5", "chrome://")
++    content = content.replace("zzzyyyyxxxx6", "/chrome/")
++    content = content.replace("zzzyyyyxxxx7", "chrome_")
++    content = content.replace("zzzyyyyxxxx8", ".chromium.org")
++    content = content.replace("zzzyyyyxxxx9", "chromebook")
++    content = content.replace("zzzyyyyxxxxA", "chromeos")
++    # if "dontreplace" in content_orig:
++    #   raise exception.MissingElement("stop")
++    #   print(content + " <-- " + content_orig)
++    return content
+ 
+ class GrdPartContentHandler(xml.sax.handler.ContentHandler):
+   def __init__(self, parent):

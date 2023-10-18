@@ -1,0 +1,49 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sun, 31 Jul 2022 22:13:11 +0200
+Subject: Disable PrivacyGuide
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ chrome/browser/ui/webui/settings/settings_ui.cc | 2 +-
+ chrome/common/chrome_features.cc                | 8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -331,7 +331,7 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
+ #endif  // !BUILDFLAG(IS_CHROMEOS_LACROS)
+ 
+   bool show_privacy_guide =
+-      !chrome::ShouldDisplayManagedUi(profile) && !profile->IsChild();
++      false;
+   html_source->AddBoolean("showPrivacyGuide", show_privacy_guide);
+ 
+   html_source->AddBoolean("enablePrivacyGuide3", base::FeatureList::IsEnabled(
+diff --git a/chrome/common/chrome_features.cc b/chrome/common/chrome_features.cc
+--- a/chrome/common/chrome_features.cc
++++ b/chrome/common/chrome_features.cc
+@@ -518,8 +518,8 @@ BASE_FEATURE(kHaTSDesktopDevToolsIssuesCSP,
+ 
+ // Enables or disables the Happiness Tracking System for Desktop Privacy Guide.
+ BASE_FEATURE(kHappinessTrackingSurveysForDesktopPrivacyGuide,
+-             "HappinessTrackingSurveysForDesktopPrivacyGuide",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++             "HappinessTrackingSurveysForDesktopPrivacyGuide",                      // must be disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);                                    // in Bromite
+ const base::FeatureParam<base::TimeDelta>
+     kHappinessTrackingSurveysForDesktopPrivacyGuideTime{
+         &kHappinessTrackingSurveysForDesktopPrivacyGuide, "settings-time",
+@@ -1042,8 +1042,8 @@ BASE_FEATURE(kPrintPreviewSetupAssistance,
+ #endif
+ 
+ BASE_FEATURE(kPrivacyGuideAndroid,
+-             "PrivacyGuideAndroid",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++             "PrivacyGuideAndroid",               // always disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);  // in Bromite
+ 
+ #if BUILDFLAG(IS_ANDROID)
+ BASE_FEATURE(kPrivacyGuideAndroidPostMVP,
+--
+2.25.1

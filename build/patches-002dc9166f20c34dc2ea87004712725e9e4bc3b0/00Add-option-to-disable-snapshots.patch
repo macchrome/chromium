@@ -1,0 +1,226 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Mon, 21 Aug 2023 14:03:25 +0000
+Subject: Add option to disable snapshots
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../tab_management/TabGridViewBinder.java     |  9 +++-
+ .../tasks/tab_management/TabProperties.java   |  5 +++
+ .../java/res/xml/privacy_preferences.xml      |  5 +++
+ .../chrome/browser/app/ChromeActivity.java    |  3 +-
+ .../layouts/content/TabContentManager.java    |  7 +++-
+ .../privacy/settings/PrivacySettings.java     | 42 ++++++++++++++++++-
+ .../strings/android_chrome_strings.grd        |  8 ++++
+ 7 files changed, 73 insertions(+), 6 deletions(-)
+
+diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java
+@@ -294,8 +294,12 @@ class TabGridViewBinder {
+                 updateThumbnailMatrix(thumbnail, result, thumbnailSize);
+                 thumbnail.setImageBitmap(result);
+             } else if (isMostRecentRequest) {
+-                // If the most recent request is a null bitmap ensure a placeholder is visible.
+-                thumbnail.setImageDrawable(null);
++                TabListFaviconProvider.TabFavicon tabFavicon = model.get(TabProperties.FAVICON);
++                if (tabFavicon != null) {
++                    thumbnail.setScaleType(ImageView.ScaleType.CENTER);
++                    thumbnail.setImageDrawable(
++                            isSelected ? tabFavicon.getSelectedDrawable() : tabFavicon.getDefaultDrawable());
++                }
+             }
+         };
+         if (sThumbnailFetcherForTesting != null) {
+@@ -370,6 +374,7 @@ class TabGridViewBinder {
+      */
+     private static void setFavicon(ViewLookupCachingFrameLayout rootView, PropertyModel model,
+             TabListFaviconProvider.TabFavicon favicon) {
++        model.set(TabProperties.FAVICON, favicon);
+         ImageView faviconView = (ImageView) rootView.fastFindViewById(R.id.tab_favicon);
+         if (favicon == null) {
+             faviconView.setImageDrawable(null);
+diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabProperties.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabProperties.java
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabProperties.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabProperties.java
+@@ -56,6 +56,9 @@ public class TabProperties {
+     public static final WritableBooleanPropertyKey FAVICON_FETCHED =
+             new WritableBooleanPropertyKey();
+ 
++    public static final WritableObjectPropertyKey<TabListFaviconProvider.TabFavicon> FAVICON =
++            new WritableObjectPropertyKey<>();
++
+     /**
+      * Property for lazily fetching favicons when required by an item in a UI.
+      */
+@@ -134,9 +137,11 @@ public class TabProperties {
+             SELECTABLE_TAB_ACTION_BUTTON_BACKGROUND,
+             SELECTABLE_TAB_ACTION_BUTTON_SELECTED_BACKGROUND, URL_DOMAIN, ACCESSIBILITY_DELEGATE,
+             CARD_TYPE, CONTENT_DESCRIPTION_STRING, CLOSE_BUTTON_DESCRIPTION_STRING,
++            FAVICON,
+             SHOPPING_PERSISTED_TAB_DATA_FETCHER, SHOULD_SHOW_PRICE_DROP_TOOLTIP};
+ 
+     public static final PropertyKey[] ALL_KEYS_TAB_STRIP = new PropertyKey[] {TAB_ID,
+             TAB_SELECTED_LISTENER, TAB_CLOSED_LISTENER, FAVICON_FETCHED, FAVICON_FETCHER,
++            FAVICON,
+             IS_SELECTED, TITLE, TABSTRIP_FAVICON_BACKGROUND_COLOR_ID, IS_INCOGNITO};
+ }
+diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
+--- a/chrome/android/java/res/xml/privacy_preferences.xml
++++ b/chrome/android/java/res/xml/privacy_preferences.xml
+@@ -88,6 +88,11 @@ found in the LICENSE file.
+         android:title="@string/open_external_links_incognito_title"
+         android:summary="@string/open_external_links_incognito_summary"
+         android:defaultValue="false" />
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="tabgrid_use_icons"
++        android:title="@string/tabgrid_use_icons_title"
++        android:summary="@string/tabgrid_use_icons_summary"
++        android:defaultValue="false" />
+     <Preference
+         android:key="privacy_sandbox"
+         android:title="@string/prefs_privacy_sandbox"
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+@@ -147,6 +147,7 @@ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.Pref;
+ import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
+ import org.chromium.chrome.browser.printing.TabPrinter;
++import org.chromium.chrome.browser.privacy.settings.PrivacySettings;
+ import org.chromium.chrome.browser.profiles.Profile;
+ import org.chromium.chrome.browser.readaloud.ReadAloudController;
+ import org.chromium.chrome.browser.selection.SelectionPopupBackPressHandler;
+@@ -657,7 +658,7 @@ public abstract class ChromeActivity<C extends ChromeActivityComponent>
+ 
+             TabModelSelector tabModelSelector = mTabModelOrchestrator.getTabModelSelector();
+             setTabContentManager(new TabContentManager(this, mBrowserControlsManagerSupplier.get(),
+-                    !SysUtils.isLowEndDevice(),
++                    !ContextUtils.getAppSharedPreferences().getBoolean(PrivacySettings.PREF_TABGRID_USE_ICONS, false),
+                     tabModelSelector != null ? tabModelSelector::getTabById : null));
+ 
+             getBrowserControlsManager().initialize(
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/content/TabContentManager.java b/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/content/TabContentManager.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/content/TabContentManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/content/TabContentManager.java
+@@ -324,9 +324,12 @@ public class TabContentManager {
+      * @param forceUpdate Whether to obtain the thumbnail from the live content.
+      * @param writeBack When {@code forceUpdate}, whether to write the thumbnail to cache.
+      */
+-    public void getTabThumbnailWithCallback(@NonNull int tabId, @NonNull Size thumbnailSize,
++    public void getTabThumbnailWithCallback(@NonNull int tabId, @NonNull Size thumbnailSize, //
+             @NonNull Callback<Bitmap> callback, boolean forceUpdate, boolean writeBack) {
+-        if (!mSnapshotsEnabled) return;
++        if (!mSnapshotsEnabled) {
++            callback.onResult(null);
++            return;
++        }
+ 
+         // TODO(crbug/1444782): Remove forceUpdate and writeBack params from here and don't
+         // trigger a captureThumbnail. This should be feasible once the
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+@@ -69,6 +69,11 @@ import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
+ import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
+ import org.chromium.components.browser_ui.settings.ManagedPreferenceDelegate;
+ 
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.INeedSnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
++import org.chromium.chrome.browser.ApplicationLifetime;
++
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+@@ -77,7 +82,15 @@ import java.util.List;
+  */
+ public class PrivacySettings extends PreferenceFragmentCompat
+         implements Preference.OnPreferenceChangeListener, FragmentHelpAndFeedbackLauncher,
+-                   ProfileDependentSetting {
++                   ProfileDependentSetting, INeedSnackbarManager {
++    private SnackbarManager mSnackbarManager;
++    private Snackbar mSnackbar;
++
++    @Override
++    public void setSnackbarManager(SnackbarManager manager) {
++        mSnackbarManager = manager;
++    }
++
+     private static final String PREF_CAN_MAKE_PAYMENT = "can_make_payment";
+     private static final String PREF_PRELOAD_PAGES = "preload_pages";
+     private static final String PREF_HTTPS_FIRST_MODE = "https_first_mode";
+@@ -145,6 +158,21 @@ public class PrivacySettings extends PreferenceFragmentCompat
+             }
+         }
+ 
++        mSnackbar = Snackbar.make(getActivity().getString(R.string.ui_relaunch_notice),
++                new SnackbarManager.SnackbarController() {
++                        @Override
++                        public void onDismissNoAction(Object actionData) { }
++
++                        @Override
++                        public void onAction(Object actionData) {
++                                ApplicationLifetime.terminate(true);
++                        }
++                }, Snackbar.TYPE_NOTIFICATION, Snackbar.UMA_UNKNOWN)
++                .setSingleLine(false)
++                .setAction(getActivity().getString(R.string.relaunch),
++                        /*actionData*/null)
++                .setDuration(/*durationMs*/70000);
++
+         Preference privacyGuidePreference = findPreference(PREF_PRIVACY_GUIDE);
+         // Record the launch of PG from the S&P link-row entry point
+         privacyGuidePreference.setOnPreferenceClickListener(preference -> {
+@@ -293,6 +321,7 @@ public class PrivacySettings extends PreferenceFragmentCompat
+ 
+     public static final String PREF_ALLOW_CUSTOM_TAB_INTENTS = "allow_custom_tab_intents";
+     public static final String PREF_OPEN_EXTERNAL_LINKS_INCOGNITO = "open_external_links_incognito";
++    public static final String PREF_TABGRID_USE_ICONS = "tabgrid_use_icons";
+ 
+     @Override
+     public boolean onPreferenceChange(Preference preference, Object newValue) {
+@@ -316,6 +345,13 @@ public class PrivacySettings extends PreferenceFragmentCompat
+             SharedPreferences.Editor sharedPreferencesEditor = ContextUtils.getAppSharedPreferences().edit();
+             sharedPreferencesEditor.putBoolean(PREF_OPEN_EXTERNAL_LINKS_INCOGNITO, (boolean)newValue);
+             sharedPreferencesEditor.apply();
++        } else if (PREF_TABGRID_USE_ICONS.equals(key)) {
++            SharedPreferences.Editor sharedPreferencesEditor = ContextUtils.getAppSharedPreferences().edit();
++            sharedPreferencesEditor.putBoolean(PREF_TABGRID_USE_ICONS, (boolean)newValue);
++            sharedPreferencesEditor.apply();
++            if (!mSnackbarManager.isShowing()) {
++                mSnackbarManager.showSnackbar(mSnackbar);
++            }
+         }
+         return true;
+     }
+@@ -356,6 +392,10 @@ public class PrivacySettings extends PreferenceFragmentCompat
+                             : R.string.text_off);
+         }
+ 
++        Preference tabGridUseIcons =
++                (ChromeSwitchPreference) findPreference(PREF_TABGRID_USE_ICONS);
++        tabGridUseIcons.setOnPreferenceChangeListener(this);
++
+         Preference refererPolicyPref = findPreference(PREF_REFERER_POLICY);
+         refererPolicyPref.setSummary(
+                 RefererSettingsFragment.getRefererSummaryString(getContext()));
+diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -5407,6 +5407,14 @@ To change this setting, <ph name="BEGIN_LINK">&lt;resetlink&gt;</ph>reset sync<p
+         Your <ph name="FQDN">%1$s<ex>www.amazon.com</ex></ph> timer ran out. It'll start again tomorrow.
+       </message>
+ 
++      <!-- Tab Broup Disable Thumbnail -->
++      <message name="IDS_TABGRID_USE_ICONS_TITLE" desc="Text for 'Use icons in the tab grid' settings-privacy option.">
++        Use only icons in the tab grid
++      </message>
++      <message name="IDS_TABGRID_USE_ICONS_SUMMARY" desc="Summary text for 'Use icons in the tab grid' settings-privacy option.">
++        Disable the saving of snapshots to disk
++      </message>
++
+       <!-- Tab Group Tab Switcher strings -->
+       <message name="IDS_TAB_MANAGEMENT_MODULE_TITLE" desc="Text shown when the Tab Management module is referenced in install start, success, failure UI (e.g. in IDS_MODULE_INSTALL_START_TEXT, which will expand to 'Installing Tab management for Chrome…').">
+         Tab management
+--
+2.25.1

@@ -1,0 +1,81 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sat, 20 Jan 2018 21:17:27 +0100
+Subject: openH264: enable ARM/ARM64 optimizations
+
+Enable the optimizations not only for ChromeOS but for all compatbile ARM/ARM64 architectures
+Limit threads auto-detect only for iOS
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../modules/mediarecorder/h264_encoder.cc     |  6 ++---
+ third_party/openh264/BUILD.gn                 | 24 ++++++++++++++-----
+ 2 files changed, 21 insertions(+), 9 deletions(-)
+
+diff --git a/third_party/blink/renderer/modules/mediarecorder/h264_encoder.cc b/third_party/blink/renderer/modules/mediarecorder/h264_encoder.cc
+--- a/third_party/blink/renderer/modules/mediarecorder/h264_encoder.cc
++++ b/third_party/blink/renderer/modules/mediarecorder/h264_encoder.cc
+@@ -223,11 +223,11 @@ bool H264Encoder::ConfigureEncoder(const gfx::Size& size) {
+     init_params.iRCMode = RC_OFF_MODE;
+   }
+ 
+-#if BUILDFLAG(IS_CHROMEOS)
+-  init_params.iMultipleThreadIdc = 0;
+-#else
++#if BUILDFLAG(IS_MAC)
+   // Threading model: Set to 1 due to https://crbug.com/583348.
+   init_params.iMultipleThreadIdc = 1;
++#else
++  init_params.iMultipleThreadIdc = 0;
+ #endif
+ 
+   // TODO(mcasas): consider reducing complexity if there are few CPUs available.
+diff --git a/third_party/openh264/BUILD.gn b/third_party/openh264/BUILD.gn
+--- a/third_party/openh264/BUILD.gn
++++ b/third_party/openh264/BUILD.gn
+@@ -131,8 +131,12 @@ if (use_assembler) {
+ 
+ source_set("common") {
+   sources = openh264_common_sources
+-  if (is_chromeos && current_cpu == "arm") {
+-    sources += openh264_common_sources_asm_arm
++  if (is_chromeos || is_android) {
++    if (current_cpu == "arm") {
++      sources += openh264_common_sources_asm_arm
++    } else if (current_cpu == "arm64") {
++      sources += openh264_common_sources_asm_arm64
++    }
+   }
+   include_dirs = openh264_common_include_dirs
+ 
+@@ -157,8 +161,12 @@ source_set("common") {
+ 
+ source_set("processing") {
+   sources = openh264_processing_sources
+-  if (is_chromeos && current_cpu == "arm") {
+-    sources += openh264_processing_sources_asm_arm
++  if (is_chromeos || is_android) {
++    if (current_cpu == "arm") {
++      sources += openh264_processing_sources_asm_arm
++    } else if (current_cpu == "arm64") {
++      sources += openh264_processing_sources_asm_arm64
++    }
+   }
+   include_dirs = openh264_processing_include_dirs
+ 
+@@ -174,8 +182,12 @@ source_set("processing") {
+ 
+ source_set("encoder") {
+   sources = openh264_encoder_sources
+-  if (is_chromeos && current_cpu == "arm") {
+-    sources += openh264_encoder_sources_asm_arm
++  if (is_chromeos || is_android) {
++    if (current_cpu == "arm") {
++      sources += openh264_encoder_sources_asm_arm
++    } else if (current_cpu == "arm64") {
++      sources += openh264_encoder_sources_asm_arm64
++    }
+   }
+   include_dirs = openh264_encoder_include_dirs
+ 
+--
+2.25.1

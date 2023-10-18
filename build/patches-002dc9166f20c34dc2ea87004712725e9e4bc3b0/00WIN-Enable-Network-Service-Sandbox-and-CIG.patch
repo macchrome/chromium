@@ -1,0 +1,41 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Fri, 17 Feb 2023 16:23:20 +0000
+Subject: WIN Enable Network Service Sandbox and CIG
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/chrome_content_browser_client.cc | 2 +-
+ sandbox/policy/features.cc                      | 6 +++++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -776,7 +776,7 @@ const char kDEPRECATED_AllowlistedExtensionID[] = "whitelisted-extension-id";
+ // https://blogs.windows.com/blog/tag/code-integrity-guard/.
+ BASE_FEATURE(kNetworkServiceCodeIntegrity,
+              "NetworkServiceCodeIntegrity",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++             base::FEATURE_ENABLED_BY_DEFAULT);
+ 
+ #endif  // BUILDFLAG(IS_WIN) && !defined(COMPONENT_BUILD) &&
+         // !defined(ADDRESS_SANITIZER)
+diff --git a/sandbox/policy/features.cc b/sandbox/policy/features.cc
+--- a/sandbox/policy/features.cc
++++ b/sandbox/policy/features.cc
+@@ -18,8 +18,12 @@ namespace sandbox::policy::features {
+ // Enables network service sandbox.
+ // (Only causes an effect when feature kNetworkServiceInProcess is disabled.)
+ BASE_FEATURE(kNetworkServiceSandbox,
+-             "NetworkServiceSandbox",
++             "NetworkServiceSandbox", // enabled only in windows
++#if BUILDFLAG(IS_WIN)
++             base::FEATURE_ENABLED_BY_DEFAULT);
++#else
+              base::FEATURE_DISABLED_BY_DEFAULT);
++#endif
+ 
+ #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+ // Enables a fine-grained seccomp-BPF syscall filter for the network service.
+--
+2.25.1

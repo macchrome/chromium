@@ -1,0 +1,36 @@
+From: "Kevin F. Haggerty" <haggertk@lineageos.org>
+Date: Sun, 27 Dec 2020 09:42:54 -0700
+Subject: webview: Hard no to persistent histograms
+
+* It's probably some kind of bug somewhere that these are never
+  deleted, but they don't really add value to us in the first
+  place.
+* Stop eating 4MB every single time any app that uses webview
+  ever opens.
+* These were guarded by a feature check before
+  https://chromium.googlesource.com/chromium/src/+/b86102f2a243
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ android_webview/browser/aw_field_trials.cc | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/android_webview/browser/aw_field_trials.cc b/android_webview/browser/aw_field_trials.cc
+--- a/android_webview/browser/aw_field_trials.cc
++++ b/android_webview/browser/aw_field_trials.cc
+@@ -49,13 +49,6 @@ class AwFeatureOverrides {
+ }  // namespace
+ 
+ void AwFieldTrials::OnVariationsSetupComplete() {
+-  // Persistent histograms must be enabled ASAP, but depends on Features.
+-  base::FilePath metrics_dir;
+-  if (base::PathService::Get(base::DIR_ANDROID_APP_DATA, &metrics_dir)) {
+-    InstantiatePersistentHistogramsWithFeaturesAndCleanup(metrics_dir);
+-  } else {
+-    NOTREACHED();
+-  }
+ }
+ 
+ // TODO(crbug.com/1453407): Consider to migrate all WebView feature overrides
+--
+2.25.1

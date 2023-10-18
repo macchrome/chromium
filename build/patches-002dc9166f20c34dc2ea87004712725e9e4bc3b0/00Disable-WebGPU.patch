@@ -1,0 +1,35 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Mon, 1 May 2023 12:07:49 +0000
+Subject: Disable WebGPU
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ gpu/config/gpu_finch_features.cc                 | 2 +-
+ third_party/blink/renderer/modules/webgpu/gpu.cc | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gpu/config/gpu_finch_features.cc b/gpu/config/gpu_finch_features.cc
+--- a/gpu/config/gpu_finch_features.cc
++++ b/gpu/config/gpu_finch_features.cc
+@@ -284,7 +284,7 @@ BASE_FEATURE(kEnableDrDcVulkan,
+ // Enable WebGPU on gpu service side only. This is used with origin trial and
+ // enabled by default on supported platforms.
+ #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS_ASH)
+-#define WEBGPU_ENABLED base::FEATURE_ENABLED_BY_DEFAULT
++#define WEBGPU_ENABLED base::FEATURE_DISABLED_BY_DEFAULT
+ #else
+ #define WEBGPU_ENABLED base::FEATURE_DISABLED_BY_DEFAULT
+ #endif
+diff --git a/third_party/blink/renderer/modules/webgpu/gpu.cc b/third_party/blink/renderer/modules/webgpu/gpu.cc
+--- a/third_party/blink/renderer/modules/webgpu/gpu.cc
++++ b/third_party/blink/renderer/modules/webgpu/gpu.cc
+@@ -357,6 +357,7 @@ ScriptPromise GPU::requestAdapter(ScriptState* script_state,
+         "WebGPU is experimental on this platform. See "
+         "https://github.com/gpuweb/gpuweb/wiki/"
+         "Implementation-Status#implementation-status"));
++    //(UAZO) add site setting
+   }
+ 
+   auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+--
+2.25.1

@@ -1,0 +1,49 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Wed, 11 Oct 2017 23:24:58 +0200
+Subject: Disable omission of URL elements in Omnibox
+
+Disable all omissions because they are used throughout the code without
+a corresponding user option to individually disable their usage.
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../toolbar/chrome_location_bar_model_delegate.cc  |  2 +-
+ components/url_formatter/url_formatter.cc          | 14 +++++++-------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc b/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
+--- a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
++++ b/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
+@@ -289,5 +289,5 @@ TemplateURLService* ChromeLocationBarModelDelegate::GetTemplateURLService() {
+ // static
+ void ChromeLocationBarModelDelegate::RegisterProfilePrefs(
+     user_prefs::PrefRegistrySyncable* registry) {
+-  registry->RegisterBooleanPref(omnibox::kPreventUrlElisionsInOmnibox, false);
++  registry->RegisterBooleanPref(omnibox::kPreventUrlElisionsInOmnibox, true);
+ }
+diff --git a/components/url_formatter/url_formatter.cc b/components/url_formatter/url_formatter.cc
+--- a/components/url_formatter/url_formatter.cc
++++ b/components/url_formatter/url_formatter.cc
+@@ -533,13 +533,13 @@ bool HasTwoViewSourceSchemes(base::StringPiece spec) {
+ }  // namespace
+ 
+ const FormatUrlType kFormatUrlOmitNothing = 0;
+-const FormatUrlType kFormatUrlOmitUsernamePassword = 1 << 0;
+-const FormatUrlType kFormatUrlOmitHTTP = 1 << 1;
+-const FormatUrlType kFormatUrlOmitTrailingSlashOnBareHostname = 1 << 2;
+-const FormatUrlType kFormatUrlOmitHTTPS = 1 << 3;
+-const FormatUrlType kFormatUrlOmitTrivialSubdomains = 1 << 5;
+-const FormatUrlType kFormatUrlTrimAfterHost = 1 << 6;
+-const FormatUrlType kFormatUrlOmitFileScheme = 1 << 7;
++const FormatUrlType kFormatUrlOmitUsernamePassword = 0 << 0;
++const FormatUrlType kFormatUrlOmitHTTP = 0 << 1;
++const FormatUrlType kFormatUrlOmitTrailingSlashOnBareHostname = 0 << 2;
++const FormatUrlType kFormatUrlOmitHTTPS = 0 << 3;
++const FormatUrlType kFormatUrlOmitTrivialSubdomains = 0 << 5;
++const FormatUrlType kFormatUrlTrimAfterHost = 0 << 6;
++const FormatUrlType kFormatUrlOmitFileScheme = 0 << 7;
+ const FormatUrlType kFormatUrlOmitMailToScheme = 1 << 8;
+ const FormatUrlType kFormatUrlOmitMobilePrefix = 1 << 9;
+ 
+--
+2.25.1

@@ -1,0 +1,970 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Wed, 30 Sep 2020 07:40:01 +0000
+Subject: Timezone customization
+
+Allow specifying a custom timezone, or using a random one.
+
+See also: https://github.com/bromite/bromite/wiki/TimezoneOverride
+
+Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+Require: Content-settings-infrastructure.patch
+---
+ .../browser_ui/site_settings/android/BUILD.gn |   3 +
+ .../res/layout/time_zone_select_dialog.xml    |  36 ++++
+ ...ezoneoverride_site_settings_preference.xml |  68 ++++++
+ ...imezoneOverrideSiteSettingsPreference.java | 196 ++++++++++++++++++
+ .../WebsitePreferenceBridge.java              |  10 +
+ ...BromiteTimezoneOverrideContentSetting.java | 147 +++++++++++++
+ .../android/website_preference_bridge.cc      |  16 ++
+ .../bromite_content_settings/timezone.grdp    |  39 ++++
+ .../timezone_override.inc                     |  23 ++
+ .../browser/content_settings_pref_provider.cc |  16 ++
+ .../browser/content_settings_pref_provider.h  |   4 +
+ .../core/browser/content_settings_utils.cc    |   5 +
+ .../core/browser/host_content_settings_map.cc |   8 +
+ .../core/browser/host_content_settings_map.h  |   3 +
+ .../bromite_content_settings/TIMEZONE.inc     |   2 +
+ .../core/common/content_settings.h            |   1 +
+ .../core/common/content_settings.mojom        |   1 +
+ .../common/content_settings_mojom_traits.cc   |   3 +-
+ .../common/content_settings_mojom_traits.h    |   5 +
+ .../core/common/pref_names.cc                 |   3 +
+ .../content_settings/core/common/pref_names.h |   2 +
+ .../renderer/content_settings_agent_impl.cc   |  80 +++++++
+ .../renderer/content_settings_agent_impl.h    |  11 +
+ 23 files changed, 681 insertions(+), 1 deletion(-)
+ create mode 100755 components/browser_ui/site_settings/android/java/res/layout/time_zone_select_dialog.xml
+ create mode 100755 components/browser_ui/site_settings/android/java/res/layout/timezoneoverride_site_settings_preference.xml
+ create mode 100755 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java
+ create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteTimezoneOverrideContentSetting.java
+ create mode 100644 components/browser_ui/strings/bromite_content_settings/timezone.grdp
+ create mode 100644 components/content_settings/core/browser/bromite_content_settings/timezone_override.inc
+ create mode 100644 components/content_settings/core/common/bromite_content_settings/TIMEZONE.inc
+
+diff --git a/components/browser_ui/site_settings/android/BUILD.gn b/components/browser_ui/site_settings/android/BUILD.gn
+--- a/components/browser_ui/site_settings/android/BUILD.gn
++++ b/components/browser_ui/site_settings/android/BUILD.gn
+@@ -104,6 +104,7 @@ android_library("java") {
+     "java/src/org/chromium/components/browser_ui/site_settings/WebsitePreference.java",
+     "java/src/org/chromium/components/browser_ui/site_settings/WebsitePreferenceBridge.java",
+     "java/src/org/chromium/components/browser_ui/site_settings/WebsiteRowPreference.java",
++    "java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java"
+   ]
+ 
+   resources_package = "org.chromium.components.browser_ui.site_settings"
+@@ -275,6 +276,8 @@ android_resources("java_resources") {
+     "java/res/xml/site_settings_preferences.xml",
+     "java/res/xml/site_settings_preferences_with_categories.xml",
+     "java/res/xml/website_preferences.xml",
++    "java/res/layout/timezoneoverride_site_settings_preference.xml",
++    "java/res/layout/time_zone_select_dialog.xml",
+   ]
+ 
+   deps = [
+diff --git a/components/browser_ui/site_settings/android/java/res/layout/time_zone_select_dialog.xml b/components/browser_ui/site_settings/android/java/res/layout/time_zone_select_dialog.xml
+new file mode 100755
+--- /dev/null
++++ b/components/browser_ui/site_settings/android/java/res/layout/time_zone_select_dialog.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    This file is part of Bromite.
++
++    Bromite is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Bromite is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Bromite. If not, see <https://www.gnu.org/licenses/>.
++-->
++
++<!-- Layout used by the TimezoneOverrideSettingsPreference. -->
++
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:orientation="vertical"
++    style="@style/AlertDialogContent">
++
++  <ListView
++      android:id="@+id/listView"
++      android:layout_width="match_parent"
++      android:layout_height="wrap_content"
++      android:layout_marginBottom="8dp"
++      android:layout_marginEnd="8dp"
++      android:layout_marginStart="8dp"
++      android:layout_marginTop="8dp"
++      android:choiceMode="singleChoice"
++      android:listSelector="#666666"/>
++
++</LinearLayout>
+\ No newline at end of file
+diff --git a/components/browser_ui/site_settings/android/java/res/layout/timezoneoverride_site_settings_preference.xml b/components/browser_ui/site_settings/android/java/res/layout/timezoneoverride_site_settings_preference.xml
+new file mode 100755
+--- /dev/null
++++ b/components/browser_ui/site_settings/android/java/res/layout/timezoneoverride_site_settings_preference.xml
+@@ -0,0 +1,68 @@
++<!--
++    This file is part of Bromite.
++
++    Bromite is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Bromite is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Bromite. If not, see <https://www.gnu.org/licenses/>.
++-->
++
++<!-- Layout used by the TimezoneOverrideSettingsPreference. -->
++
++<LinearLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:focusable="false"
++    android:orientation="vertical">
++
++  <org.chromium.components.browser_ui.widget.RadioButtonWithDescriptionLayout
++      android:id="@+id/radio_button_layout"
++      android:layout_width="match_parent"
++      android:layout_height="match_parent">
++
++    <org.chromium.components.browser_ui.widget.RadioButtonWithDescription
++        android:id="@+id/allowed"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:paddingStart="?android:attr/listPreferredItemPaddingStart"
++        app:primaryText="@string/website_settings_category_timezone_override_allowed" />
++
++    <org.chromium.components.browser_ui.widget.RadioButtonWithDescription
++        android:id="@+id/blocked"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:paddingStart="?android:attr/listPreferredItemPaddingStart"
++        app:primaryText="@string/website_settings_category_timezone_override_random" />
++
++    <org.chromium.components.browser_ui.widget.RadioButtonWithEditText
++        android:id="@+id/ask"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:paddingStart="?android:attr/listPreferredItemPaddingStart"
++        android:inputType="text"
++        android:hint="@string/website_settings_category_timezone_override_custom_hint"
++        app:descriptionText="@string/website_settings_category_timezone_override_custom" />
++
++  </org.chromium.components.browser_ui.widget.RadioButtonWithDescriptionLayout>
++
++  <org.chromium.ui.widget.ButtonCompat
++    android:id="@+id/select_button"
++    style="@style/TextButton"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:paddingBottom="16dp"
++    android:paddingTop="16dp"
++    android:text="@string/website_settings_select_button"
++    app:verticalInset="0dp" />
++
++</LinearLayout>
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java
+new file mode 100755
+--- /dev/null
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java
+@@ -0,0 +1,196 @@
++/*
++    This file is part of Bromite.
++
++    Bromite is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Bromite is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Bromite. If not, see <https://www.gnu.org/licenses/>.
++*/
++
++package org.chromium.components.browser_ui.site_settings;
++
++import org.chromium.base.Log;
++import android.content.Context;
++import android.content.Intent;
++import android.content.DialogInterface;
++import android.view.View;
++import android.widget.RadioGroup;
++import android.widget.Button;
++import android.widget.TextView;
++import android.util.AttributeSet;
++import android.widget.ArrayAdapter;
++import android.widget.ListView;
++import android.view.LayoutInflater;
++import android.widget.AdapterView;
++import android.graphics.Color;
++
++import androidx.preference.Preference;
++import androidx.preference.PreferenceViewHolder;
++import androidx.appcompat.app.AlertDialog;
++
++import org.chromium.content_public.browser.BrowserContextHandle;
++import org.chromium.components.content_settings.ContentSettingValues;
++import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
++import org.chromium.components.browser_ui.widget.RadioButtonWithDescription;
++import org.chromium.components.browser_ui.widget.RadioButtonWithEditText;
++import org.chromium.components.browser_ui.widget.TintedDrawable;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.TimeZone;
++
++/**
++ * TimezoneOverride Preference for SiteSettings.
++ */
++public class TimezoneOverrideSiteSettingsPreference
++        extends Preference implements BromiteCustomTriStateSiteSettingsPreferenceImpl,
++                                      RadioGroup.OnCheckedChangeListener,
++                                      RadioButtonWithEditText.OnTextChangeListener {
++    private @ContentSettingValues int mSetting = ContentSettingValues.DEFAULT;
++    private RadioButtonWithDescription mAllowed;
++    private RadioButtonWithEditText mAsk;
++    private RadioButtonWithDescription mBlocked;
++    private RadioGroup mRadioGroup;
++    private TextView mSelectButton;
++
++    private String currentSelected;
++
++    private BrowserContextHandle mBrowserContextHandle;
++
++    public TimezoneOverrideSiteSettingsPreference(Context context, AttributeSet attrs) {
++        super(context, attrs);
++
++        setLayoutResource(R.layout.timezoneoverride_site_settings_preference);
++        setSelectable(false);
++    }
++
++    public void initialize(@ContentSettingValues int setting, BrowserContextHandle browserContextHandle) {
++        mSetting = setting;
++        mBrowserContextHandle = browserContextHandle;
++    }
++
++    @Override
++    public @ContentSettingValues int getCheckedSetting() {
++        return mSetting;
++    }
++
++    @Override
++    public void onCheckedChanged(RadioGroup group, int checkedId) {
++        if (mAllowed.isChecked()) {
++            mSetting = ContentSettingValues.ALLOW;
++        } else if (mAsk.isChecked()) {
++            mSetting = ContentSettingValues.ASK;
++        } else if (mBlocked.isChecked()) {
++            mSetting = ContentSettingValues.BLOCK;
++        }
++
++        callChangeListener(mSetting);
++    }
++
++    @Override
++    public void onBindViewHolder(PreferenceViewHolder holder) {
++        super.onBindViewHolder(holder);
++
++        mAllowed = (RadioButtonWithDescription) holder.findViewById(R.id.allowed);
++        mAsk = (RadioButtonWithEditText) holder.findViewById(R.id.ask);
++        mBlocked = (RadioButtonWithDescription) holder.findViewById(R.id.blocked);
++        mRadioGroup = (RadioGroup) holder.findViewById(R.id.radio_button_layout);
++        mRadioGroup.setOnCheckedChangeListener(this);
++
++        if (mBrowserContextHandle != null)
++            mAsk.setPrimaryText(WebsitePreferenceBridge.getCustomTimezone(mBrowserContextHandle));
++        mAsk.addTextChangeListener(this);
++
++        ListView listView = (ListView)holder.findViewById(R.id.listView);
++
++        mSelectButton = (TextView) holder.findViewById(R.id.select_button);
++        mSelectButton.setOnClickListener(view -> {
++          showSelectTimeZoneDialog();
++        });
++
++        RadioButtonWithDescription radioButton = findRadioButton(mSetting);
++        if (radioButton != null) radioButton.setChecked(true);
++    }
++
++    private RadioButtonWithDescription findRadioButton(@ContentSettingValues int setting) {
++        if (setting == ContentSettingValues.ALLOW) {
++            return mAllowed;
++        } else if (setting == ContentSettingValues.ASK) {
++            return mAsk;
++        } else if (setting == ContentSettingValues.BLOCK) {
++            return mBlocked;
++        } else {
++            return null;
++        }
++    }
++
++    public void onTextChanged(CharSequence newText) {
++        WebsitePreferenceBridge.setCustomTimezone(mBrowserContextHandle, newText.toString());
++    }
++
++    private void showSelectTimeZoneDialog() {
++        LayoutInflater inflater =
++                (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
++        View view = inflater.inflate(R.layout.time_zone_select_dialog, null);
++
++        ListView listView = view.findViewById(R.id.listView);
++        ArrayList<String> timezones = new ArrayList<>(Arrays.asList(TimeZone.getAvailableIDs()));
++        ArrayAdapter<String> adapter = new ArrayAdapter<String>(getContext(), android.R.layout.simple_list_item_1, android.R.id.text1, timezones);
++        listView.setAdapter(adapter);
++
++        currentSelected = String.valueOf(mAsk.getPrimaryText());
++        listView.post(new Runnable()
++        {
++          public void run()
++          {
++            for (int j = 0; j < timezones.size(); j++) {
++                if (currentSelected.equals(timezones.get(j))) {
++                    listView.requestFocusFromTouch();
++                    listView.setSelection(j);
++                    adapter.notifyDataSetChanged();
++                    break;
++                }
++            }
++          }
++        });
++
++        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
++            @Override
++            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
++                currentSelected = timezones.get(i);
++                listView.setSelected(true);
++            }
++        });
++
++        DialogInterface.OnClickListener onClickListener = new DialogInterface.OnClickListener() {
++            @Override
++            public void onClick(DialogInterface dialog, int button) {
++                if (button == AlertDialog.BUTTON_POSITIVE) {
++                    mAsk.setPrimaryText(currentSelected);
++                } else {
++                    dialog.dismiss();
++                }
++            }
++        };
++
++        AlertDialog.Builder alert =
++                new AlertDialog.Builder(getContext(), R.style.ThemeOverlay_BrowserUI_AlertDialog);
++        AlertDialog alertDialog =
++                alert.setTitle(R.string.website_settings_select_dialog_title)
++                        .setView(view)
++                        .setPositiveButton(
++                                R.string.website_settings_select_dialog_button, onClickListener)
++                        .setNegativeButton(R.string.cancel, onClickListener)
++                        .create();
++        alertDialog.getDelegate().setHandleNativeActionModesEnabled(false);
++        alertDialog.show();
++    }
++}
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/WebsitePreferenceBridge.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/WebsitePreferenceBridge.java
+--- a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/WebsitePreferenceBridge.java
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/WebsitePreferenceBridge.java
+@@ -412,6 +412,14 @@ public class WebsitePreferenceBridge {
+         return WebsitePreferenceBridgeJni.get().toHostOnlyPattern(pattern);
+     }
+ 
++    public static String getCustomTimezone(BrowserContextHandle browserContextHandle) {
++        return WebsitePreferenceBridgeJni.get().getCustomTimezone(browserContextHandle);
++    }
++
++    public static void setCustomTimezone(BrowserContextHandle browserContextHandle, String custom_timezone) {
++        WebsitePreferenceBridgeJni.get().setCustomTimezone(browserContextHandle, custom_timezone);
++    }
++
+     @NativeMethods
+     public interface Natives {
+         boolean isNotificationEmbargoedForOrigin(
+@@ -481,5 +489,7 @@ public class WebsitePreferenceBridge {
+         boolean getLocationAllowedByPolicy(BrowserContextHandle browserContextHandle);
+         String toDomainWildcardPattern(String pattern);
+         String toHostOnlyPattern(String pattern);
++        String getCustomTimezone(BrowserContextHandle browserContextHandle);
++        void setCustomTimezone(BrowserContextHandle browserContextHandle, String custom_timezone);
+     }
+ }
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteTimezoneOverrideContentSetting.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteTimezoneOverrideContentSetting.java
+new file mode 100644
+--- /dev/null
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteTimezoneOverrideContentSetting.java
+@@ -0,0 +1,147 @@
++/*
++    This file is part of Bromite.
++
++    Bromite is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 3 of the License, or
++    (at your option) any later version.
++
++    Bromite is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with Bromite. If not, see <https://www.gnu.org/licenses/>.
++*/
++
++package org.chromium.components.browser_ui.site_settings.impl;
++
++import org.chromium.components.browser_ui.site_settings.R;
++
++import org.chromium.components.browser_ui.site_settings.BromiteCustomContentSetting;
++import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
++import org.chromium.components.browser_ui.site_settings.SingleCategorySettings;
++import org.chromium.components.browser_ui.site_settings.SiteSettingsCategory;
++import org.chromium.components.browser_ui.site_settings.TimezoneOverrideSiteSettingsPreference;
++import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
++import org.chromium.components.content_settings.ContentSettingValues;
++import org.chromium.components.content_settings.ContentSettingsType;
++import org.chromium.content_public.browser.BrowserContextHandle;
++
++import android.view.View;
++import androidx.annotation.Nullable;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceScreen;
++
++import java.util.ArrayList;
++
++public class BromiteTimezoneOverrideContentSetting extends BromiteCustomContentSetting {
++    private static final String TIMEOVERRIDE_STATE_TOGGLE_KEY = "timeoverride_state_toggle";
++
++    public BromiteTimezoneOverrideContentSetting() {
++        super(/*contentSettingsType*/ ContentSettingsType.TIMEZONE_OVERRIDE,
++              /*defaultEnabledValue*/ ContentSettingValues.ALLOW,
++              /*defaultDisabledValue*/ ContentSettingValues.BLOCK,
++              /*allowException*/ true,
++              /*preferenceKey*/ "timezone_override",
++              /*profilePrefKey*/ "timezone_override_permission_list");
++    }
++
++    @Override
++    public ContentSettingsResources.ResourceItem getResourceItem() {
++        return new ContentSettingsResources.ResourceItem(
++            /*icon*/ R.drawable.web_asset,
++            /*title*/ R.string.timezone_override_permission_title,
++            /*defaultEnabledValue*/ getDefaultEnabledValue(),
++            /*defaultDisabledValue*/ getDefaultDisabledValue(),
++            /*enabledSummary*/ R.string.website_settings_category_timezone_override_custom,
++            /*disabledSummary*/ R.string.website_settings_category_timezone_override_random);
++    }
++
++    @Override
++    public int getCategorySummary(@Nullable @ContentSettingValues int value) {
++        switch (value) {
++            case ContentSettingValues.ALLOW:
++                return R.string.website_settings_category_timezone_override_allowed;
++            case ContentSettingValues.ASK:
++                return R.string.website_settings_category_timezone_override_custom;
++            case ContentSettingValues.BLOCK:
++                return R.string.website_settings_category_timezone_override_random;
++            default:
++                return 0;
++        }
++    }
++
++    @Override
++    public int[] getTriStateSettingDescriptionIDs() {
++          int[] descriptionIDs = {
++                  R.string.website_settings_category_timezone_override_allowed, // ALLOWED
++                  R.string.website_settings_category_timezone_override_custom,  // ASK
++                  R.string.website_settings_category_timezone_override_random}; // BLOCKED
++          return descriptionIDs;
++    }
++
++    @Override
++    public int getCategoryDescription() {
++        return R.string.website_settings_timeoverride_info;
++    }
++
++    @Override
++    public boolean requiresTriStateContentSetting() {
++        return true;
++    }
++
++    @Override
++    public boolean showOnlyDescriptions() {
++        return true;
++    }
++
++    @Override
++    public int getAddExceptionDialogMessage() {
++        return R.string.website_settings_category_timezone_override_allowed;
++    }
++
++    @Override
++    public @Nullable Boolean considerException(SiteSettingsCategory category, @ContentSettingValues int value) {
++        return value != ContentSettingValues.ALLOW;
++    }
++
++    @Override
++    public boolean isOnBlockList(@ContentSettingValues Integer contentSetting) {
++        return ContentSettingValues.ALLOW != contentSetting;
++    }
++
++    @Override
++    public boolean isHelpAndFeedbackEnabled() {
++        return true;
++    }
++
++    @Override
++    public String getHelpAndFeedbackActivityUrl() {
++        return "https://github.com/bromite/bromite/wiki/TimezoneOverride";
++    }
++
++    @Override
++    public void configureGlobalToggles(SiteSettingsCategory category, SingleCategorySettings setting) {
++        BrowserContextHandle browserContext = setting.getSiteSettingsDelegate().getBrowserContextHandle();
++        PreferenceScreen screen = setting.getPreferenceScreen();
++
++        Preference triStateToggle = screen.findPreference(
++                                            SingleCategorySettings.TRI_STATE_TOGGLE_KEY);
++        int order = triStateToggle.getOrder();
++        screen.removePreference(triStateToggle);
++
++        TimezoneOverrideSiteSettingsPreference timeOverrideStatePreference =
++            new TimezoneOverrideSiteSettingsPreference(setting.getContext(), null);
++        timeOverrideStatePreference.setKey(SingleCategorySettings.TRI_STATE_TOGGLE_KEY);
++        screen.addPreference(timeOverrideStatePreference);
++        timeOverrideStatePreference.setOrder(order);
++
++        timeOverrideStatePreference.setOnPreferenceChangeListener(setting);
++        @ContentSettingValues
++        int value = WebsitePreferenceBridge.getDefaultContentSetting(
++                browserContext, ContentSettingsType.TIMEZONE_OVERRIDE);
++        timeOverrideStatePreference.initialize(value, browserContext);
++    }
++}
+diff --git a/components/browser_ui/site_settings/android/website_preference_bridge.cc b/components/browser_ui/site_settings/android/website_preference_bridge.cc
+--- a/components/browser_ui/site_settings/android/website_preference_bridge.cc
++++ b/components/browser_ui/site_settings/android/website_preference_bridge.cc
+@@ -1103,3 +1103,19 @@ JNI_WebsitePreferenceBridge_ToHostOnlyPattern(
+           ContentSettingsPattern::FromString(pattern_string));
+   return ConvertUTF8ToJavaString(env, host_only_pattern.ToString());
+ }
++
++static void JNI_WebsitePreferenceBridge_SetCustomTimezone(
++    JNIEnv* env,
++    const JavaParamRef<jobject>& jbrowser_context_handle,
++    const JavaParamRef<jstring>& custom_timezone) {
++  std::string new_timezone = ConvertJavaStringToUTF8(env, custom_timezone);
++  GetHostContentSettingsMap(jbrowser_context_handle)->SetTimezoneOverrideValue(new_timezone);
++}
++
++static base::android::ScopedJavaLocalRef<jstring> JNI_WebsitePreferenceBridge_GetCustomTimezone(
++    JNIEnv* env,
++    const JavaParamRef<jobject>& jbrowser_context_handle) {
++  std::string custom_timezone;
++  GetHostContentSettingsMap(jbrowser_context_handle)->GetTimezoneOverrideValue(custom_timezone);
++  return ConvertUTF8ToJavaString(env, custom_timezone);
++}
+diff --git a/components/browser_ui/strings/bromite_content_settings/timezone.grdp b/components/browser_ui/strings/bromite_content_settings/timezone.grdp
+new file mode 100644
+--- /dev/null
++++ b/components/browser_ui/strings/bromite_content_settings/timezone.grdp
+@@ -0,0 +1,39 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++  <message name="IDS_SITE_SETTINGS_TIMEZONE_OVERRIDE_TITLE" desc="Description of the timezone override content setting page title.">
++    Timezone override
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_TIMEOVERRIDE_INFO" desc="Primary text explaining the timezone override feature." formatter_data="android_java">
++    Override timezone with a custom or random one, or use the system timezone
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_ALLOWED_TEXT" desc="Primary text explaining that sites are allowed to access the system timezone." formatter_data="android_java">
++    None (use system timezone)
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_RANDOM_TEXT" desc="Primary text for random timezone override." formatter_data="android_java">
++    Random
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_ALLOWED" desc="Summary text explaining that sites are allowed to access the system timezone." formatter_data="android_java">
++    System timezone
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_CUSTOM" desc="Summary text explaining that sites use custom timezone." formatter_data="android_java">
++    Custom timezone
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_CUSTOM_HINT" desc="Hint text for edit custom timezone." formatter_data="android_java">
++    Specify a custom timezone (default UTC)
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_RANDOM" desc="Summary text for random timezone override." formatter_data="android_java">
++    Random (for each page)
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_SELECT_BUTTON" desc="Primary button text for choosing a timezone from a list." formatter_data="android_java">
++    Choose Timezone...
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_SELECT_DIALOG_TITLE" desc="Text of the dialog to choose a timezone." formatter_data="android_java">
++    Choose Timezone
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_SELECT_DIALOG_BUTTON" desc="Primary button text in the dialog used to choose the custom timezone." formatter_data="android_java">
++    Select
++  </message>
++  <message name="IDS_TIMEZONE_OVERRIDE_PERMISSION_TITLE" desc="Title of the permission to use TimeZone Override [CHAR-LIMIT=32]" formatter_data="android_java">
++    Timezone override
++  </message>
++</grit-part>
+diff --git a/components/content_settings/core/browser/bromite_content_settings/timezone_override.inc b/components/content_settings/core/browser/bromite_content_settings/timezone_override.inc
+new file mode 100644
+--- /dev/null
++++ b/components/content_settings/core/browser/bromite_content_settings/timezone_override.inc
+@@ -0,0 +1,23 @@
++  Register(ContentSettingsType::TIMEZONE_OVERRIDE, "timezone-override", CONTENT_SETTING_ALLOW,
++           WebsiteSettingsInfo::SYNCABLE,
++           /*allowlisted_schemes=*/{},
++           /*valid_settings=*/{CONTENT_SETTING_ALLOW,   // use system time
++                               CONTENT_SETTING_ASK,     // custom timezone, default UTC
++                               CONTENT_SETTING_BLOCK},  // random
++           WebsiteSettingsInfo::TOP_ORIGIN_ONLY_SCOPE,
++           WebsiteSettingsRegistry::ALL_PLATFORMS,
++           ContentSettingsInfo::INHERIT_IN_INCOGNITO,
++           ContentSettingsInfo::EXCEPTIONS_ON_SECURE_AND_INSECURE_ORIGINS);
++
++  content_settings::WebsiteSettingsRegistry::GetInstance()
++    ->GetMutable(ContentSettingsType::TIMEZONE_OVERRIDE)
++    ->set_show_into_info_page()
++    .set_desktop_ui()
++    .set_is_renderer_content_setting()
++    .set_title_ui(IDS_SITE_SETTINGS_TIMEZONE_OVERRIDE_TITLE)
++    .set_description_ui(IDS_WEBSITE_SETTINGS_TIMEOVERRIDE_INFO)
++    .set_allowed_ui(IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_ALLOWED)
++    .set_blocked_ui(IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_RANDOM)
++    .set_allowed_exceptions_ui(IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_ALLOWED)
++    .set_blocked_exceptions_ui(IDS_WEBSITE_SETTINGS_CATEGORY_TIMEZONE_OVERRIDE_RANDOM)
++    .set_mid_sentence_ui(IDS_SITE_SETTINGS_TIMEZONE_OVERRIDE_TITLE);
+diff --git a/components/content_settings/core/browser/content_settings_pref_provider.cc b/components/content_settings/core/browser/content_settings_pref_provider.cc
+--- a/components/content_settings/core/browser/content_settings_pref_provider.cc
++++ b/components/content_settings/core/browser/content_settings_pref_provider.cc
+@@ -72,6 +72,8 @@ void PrefProvider::RegisterProfilePrefs(
+                                      info->GetPrefRegistrationFlags());
+   }
+ 
++  registry->RegisterStringPref(prefs::kContentSettingsCustomTimezone, std::string());
++
+   // Obsolete prefs ----------------------------------------------------------
+ 
+   // These prefs have been removed, but need to be registered so they can
+@@ -143,6 +145,10 @@ PrefProvider::PrefProvider(PrefService* prefs,
+     event_args->set_number_of_exceptions(
+         num_exceptions);  // PrefProvider::PrefProvider.
+   });
++
++  custom_timezone_ =
++    prefs_->GetString(
++          prefs::kContentSettingsCustomTimezone);
+ }
+ 
+ PrefProvider::~PrefProvider() {
+@@ -404,4 +410,14 @@ void PrefProvider::SetClockForTesting(base::Clock* clock) {
+   clock_ = clock;
+ }
+ 
++void PrefProvider::GetPrefTimezoneOverrideValue(std::string& timezone) const {
++  timezone = custom_timezone_;
++}
++
++void PrefProvider::SetPrefTimezoneOverrideValue(const std::string& timezone) {
++  prefs_->SetString(
++        prefs::kContentSettingsCustomTimezone, timezone);
++  custom_timezone_ = timezone;
++}
++
+ }  // namespace content_settings
+diff --git a/components/content_settings/core/browser/content_settings_pref_provider.h b/components/content_settings/core/browser/content_settings_pref_provider.h
+--- a/components/content_settings/core/browser/content_settings_pref_provider.h
++++ b/components/content_settings/core/browser/content_settings_pref_provider.h
+@@ -78,6 +78,9 @@ class PrefProvider : public UserModifiableProvider {
+ 
+   ContentSettingsPref* GetPref(ContentSettingsType type) const;
+ 
++  void GetPrefTimezoneOverrideValue(std::string& timezone) const;
++  void SetPrefTimezoneOverrideValue(const std::string& timezone);
++
+  private:
+   friend class DeadlockCheckerObserver;  // For testing.
+ 
+@@ -123,6 +126,7 @@ class PrefProvider : public UserModifiableProvider {
+   base::ThreadChecker thread_checker_;
+ 
+   raw_ptr<base::Clock> clock_;
++  std::string custom_timezone_;
+ };
+ 
+ }  // namespace content_settings
+diff --git a/components/content_settings/core/browser/content_settings_utils.cc b/components/content_settings/core/browser/content_settings_utils.cc
+--- a/components/content_settings/core/browser/content_settings_utils.cc
++++ b/components/content_settings/core/browser/content_settings_utils.cc
+@@ -159,6 +159,11 @@ void GetRendererContentSettingRules(const HostContentSettingsMap* map,
+       map->GetSettingsForOneType(ContentSettingsType::JAVASCRIPT);
+   rules->popup_redirect_rules =
+       map->GetSettingsForOneType(ContentSettingsType::POPUPS);
++
++  // pass custom timezone value to the render process
++  std::string timezone;
++  map->GetTimezoneOverrideValue(timezone);
++  rules->timezone_override_value = timezone;
+ }
+ 
+ bool IsMorePermissive(ContentSetting a, ContentSetting b) {
+diff --git a/components/content_settings/core/browser/host_content_settings_map.cc b/components/content_settings/core/browser/host_content_settings_map.cc
+--- a/components/content_settings/core/browser/host_content_settings_map.cc
++++ b/components/content_settings/core/browser/host_content_settings_map.cc
+@@ -662,6 +662,14 @@ void HostContentSettingsMap::SetClockForTesting(base::Clock* clock) {
+     provider->SetClockForTesting(clock);
+ }
+ 
++void HostContentSettingsMap::GetTimezoneOverrideValue(std::string& custom_timezone) const {
++  GetPrefProvider()->GetPrefTimezoneOverrideValue(custom_timezone);
++}
++
++void HostContentSettingsMap::SetTimezoneOverrideValue(const std::string& custom_timezone) {
++  GetPrefProvider()->SetPrefTimezoneOverrideValue(custom_timezone);
++}
++
+ void HostContentSettingsMap::RecordExceptionMetrics() {
+   auto* content_setting_registry =
+       content_settings::ContentSettingsRegistry::GetInstance();
+diff --git a/components/content_settings/core/browser/host_content_settings_map.h b/components/content_settings/core/browser/host_content_settings_map.h
+--- a/components/content_settings/core/browser/host_content_settings_map.h
++++ b/components/content_settings/core/browser/host_content_settings_map.h
+@@ -381,6 +381,9 @@ class HostContentSettingsMap : public content_settings::Observer,
+     allow_invalid_secondary_pattern_for_testing_ = allow;
+   }
+ 
++  void GetTimezoneOverrideValue(std::string& custom_timezone) const;
++  void SetTimezoneOverrideValue(const std::string& custom_timezone);
++
+  private:
+   friend class base::RefCountedThreadSafe<HostContentSettingsMap>;
+   friend class content_settings::TestUtils;
+diff --git a/components/content_settings/core/common/bromite_content_settings/TIMEZONE.inc b/components/content_settings/core/common/bromite_content_settings/TIMEZONE.inc
+new file mode 100644
+--- /dev/null
++++ b/components/content_settings/core/common/bromite_content_settings/TIMEZONE.inc
+@@ -0,0 +1,2 @@
++  // Content setting for timezone customization functionality.
++  TIMEZONE_OVERRIDE,
+diff --git a/components/content_settings/core/common/content_settings.h b/components/content_settings/core/common/content_settings.h
+--- a/components/content_settings/core/common/content_settings.h
++++ b/components/content_settings/core/common/content_settings.h
+@@ -102,6 +102,7 @@ struct RendererContentSettingRules {
+   ContentSettingsForOneType popup_redirect_rules;
+   ContentSettingsForOneType mixed_content_rules;
+   ContentSettingsForOneType auto_dark_content_rules;
++  std::string timezone_override_value;
+ };
+ 
+ namespace content_settings {
+diff --git a/components/content_settings/core/common/content_settings.mojom b/components/content_settings/core/common/content_settings.mojom
+--- a/components/content_settings/core/common/content_settings.mojom
++++ b/components/content_settings/core/common/content_settings.mojom
+@@ -102,4 +102,5 @@ struct RendererContentSettingRules {
+   array<ContentSettingPatternSource> popup_redirect_rules;
+   array<ContentSettingPatternSource> mixed_content_rules;
+   array<ContentSettingPatternSource> auto_dark_content_rules;
++  string timezone_override_value;
+ };
+diff --git a/components/content_settings/core/common/content_settings_mojom_traits.cc b/components/content_settings/core/common/content_settings_mojom_traits.cc
+--- a/components/content_settings/core/common/content_settings_mojom_traits.cc
++++ b/components/content_settings/core/common/content_settings_mojom_traits.cc
+@@ -173,7 +173,8 @@ bool StructTraits<content_settings::mojom::RendererContentSettingRulesDataView,
+          data.ReadScriptRules(&out->script_rules) &&
+          data.ReadPopupRedirectRules(&out->popup_redirect_rules) &&
+          data.ReadMixedContentRules(&out->mixed_content_rules) &&
+-         data.ReadAutoDarkContentRules(&out->auto_dark_content_rules);
++         data.ReadAutoDarkContentRules(&out->auto_dark_content_rules) &&
++         data.ReadTimezoneOverrideValue(&out->timezone_override_value);
+ }
+ 
+ }  // namespace mojo
+diff --git a/components/content_settings/core/common/content_settings_mojom_traits.h b/components/content_settings/core/common/content_settings_mojom_traits.h
+--- a/components/content_settings/core/common/content_settings_mojom_traits.h
++++ b/components/content_settings/core/common/content_settings_mojom_traits.h
+@@ -222,6 +222,11 @@ struct StructTraits<
+     return r.auto_dark_content_rules;
+   }
+ 
++  static const std::string& timezone_override_value(
++      const RendererContentSettingRules& r) {
++    return r.timezone_override_value;
++  }
++
+   static bool Read(
+       content_settings::mojom::RendererContentSettingRulesDataView data,
+       RendererContentSettingRules* out);
+diff --git a/components/content_settings/core/common/pref_names.cc b/components/content_settings/core/common/pref_names.cc
+--- a/components/content_settings/core/common/pref_names.cc
++++ b/components/content_settings/core/common/pref_names.cc
+@@ -218,4 +218,7 @@ const char kDesktopSiteDisplaySettingEnabled[] = "desktop_site.display_setting";
+ const char kDesktopSiteWindowSettingEnabled[] = "desktop_site.window_setting";
+ #endif
+ 
++const char kContentSettingsCustomTimezone[] =
++    "profile.content_settings.custom_timezone";
++
+ }  // namespace prefs
+diff --git a/components/content_settings/core/common/pref_names.h b/components/content_settings/core/common/pref_names.h
+--- a/components/content_settings/core/common/pref_names.h
++++ b/components/content_settings/core/common/pref_names.h
+@@ -102,6 +102,8 @@ extern const char kDesktopSiteDisplaySettingEnabled[];
+ extern const char kDesktopSiteWindowSettingEnabled[];
+ #endif
+ 
++extern const char kContentSettingsCustomTimezone[];
++
+ }  // namespace prefs
+ 
+ #endif  // COMPONENTS_CONTENT_SETTINGS_CORE_COMMON_PREF_NAMES_H_
+diff --git a/components/content_settings/renderer/content_settings_agent_impl.cc b/components/content_settings/renderer/content_settings_agent_impl.cc
+--- a/components/content_settings/renderer/content_settings_agent_impl.cc
++++ b/components/content_settings/renderer/content_settings_agent_impl.cc
+@@ -8,8 +8,10 @@
+ 
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
++#include "base/logging.h"
+ #include "base/metrics/histogram_macros.h"
+ #include "base/strings/string_number_conversions.h"
++#include "base/rand_util.h"
+ #include "components/content_settings/core/common/content_settings.h"
+ #include "components/content_settings/core/common/content_settings.mojom.h"
+ #include "components/content_settings/core/common/content_settings_pattern.h"
+@@ -354,6 +356,10 @@ bool ContentSettingsAgentImpl::AllowScript(bool enabled_per_settings) {
+   allow = allow || IsAllowlistedForContentSettings();
+ 
+   cached_script_permissions_[frame] = allow;
++
++  if (allow)
++    UpdateOverrides();
++
+   return allow;
+ }
+ 
+@@ -490,4 +496,78 @@ bool ContentSettingsAgentImpl::IsAllowlistedForContentSettings() const {
+   return false;
+ }
+ 
++bool ContentSettingsAgentImpl::UpdateOverrides() {
++  // Evaluate the content setting rules
++  ContentSetting setting = CONTENT_SETTING_ALLOW;
++
++  if (content_setting_rules_) {
++    setting = GetContentSetting(
++        ContentSettingsType::TIMEZONE_OVERRIDE, setting);
++  }
++  return UpdateTimeZoneOverride(
++      setting, content_setting_rules_->timezone_override_value);
++  //&& UpdateLocaleOverride(setting);
++}
++
++bool ContentSettingsAgentImpl::UpdateTimeZoneOverride(
++    ContentSetting setting,
++    const std::string& timezone_override_value) {
++  // base/i18n/icu_util.cc # 329
++
++  /* timezone_id: third_party/icu/source/i18n/timezone.cpp
++      We first try to lookup the zone ID in our system list.  If this
++      * fails, we try to parse it as a custom string GMT[+-]hh:mm.  If
++      * all else fails, we return GMT, which is probably not what the
++      * user wants, but at least is a functioning TimeZone object.
++      */
++  String timezone_id;
++
++  if (setting == CONTENT_SETTING_ALLOW) {
++    // system time
++    if (timezone_override_) {
++      timezone_override_.reset();
++    }
++    return true;
++  } else if (setting == CONTENT_SETTING_BLOCK) {
++    // timezone random
++    UErrorCode ec = U_ZERO_ERROR;
++    int32_t rawOffset = base::RandInt(-12, 11) * 3600 * 1000;
++    icu::StringEnumeration* timezones = icu::TimeZone::createEnumeration(
++        rawOffset);  // Obtain timezones by GMT timezone offset
++    if (timezones) {
++      const char* tzID;
++      int32_t length;
++      if ((tzID = timezones->next(&length, ec)) != NULL) {
++        timezone_id = String(tzID);
++      }
++      delete timezones;
++    }
++  } else if (setting == CONTENT_SETTING_ASK) {
++    if (timezone_override_value.empty())
++      timezone_id = "Europe/London";
++    else
++      timezone_id = String(timezone_override_value.c_str());
++  }
++
++  if (blink::TimeZoneController::HasTimeZoneOverride() == false) {
++    timezone_override_.reset();
++    timezone_override_ =
++        blink::TimeZoneController::SetTimeZoneOverride(timezone_id);
++    if (!timezone_override_) {
++      DLOG(WARNING) << "UpdateTimeZoneOverride - Invalid timezone id '"
++                   << timezone_id << "'";
++      return false;
++    } else {
++      DLOG(INFO)
++          << "UpdateTimeZoneOverride - setting to '"
++          << timezone_id << "'";
++      return true;
++    }
++  } else {
++    DLOG(INFO)
++        << "UpdateTimeZoneOverride: already set";
++    return false;
++  }
++}
++
+ }  // namespace content_settings
+diff --git a/components/content_settings/renderer/content_settings_agent_impl.h b/components/content_settings/renderer/content_settings_agent_impl.h
+--- a/components/content_settings/renderer/content_settings_agent_impl.h
++++ b/components/content_settings/renderer/content_settings_agent_impl.h
+@@ -25,6 +25,11 @@
+ #include "url/gurl.h"
+ #include "url/origin.h"
+ 
++#include "third_party/blink/renderer/core/inspector/locale_controller.h"
++#include "third_party/blink/renderer/core/timezone/timezone_controller.h"
++#include "third_party/icu/source/common/unicode/strenum.h"
++#include "third_party/icu/source/i18n/unicode/timezone.h"
++
+ namespace blink {
+ class WebFrame;
+ class WebURL;
+@@ -172,6 +177,12 @@ class ContentSettingsAgentImpl
+   std::unique_ptr<Delegate> delegate_;
+ 
+   mojo::AssociatedReceiverSet<mojom::ContentSettingsAgent> receivers_;
++
++  std::unique_ptr<blink::TimeZoneController::TimeZoneOverride> timezone_override_;
++
++  bool UpdateOverrides();
++  bool UpdateTimeZoneOverride(ContentSetting setting, const std::string& timezone_override_value);
++  bool UpdateLocaleOverride(ContentSetting setting);
+ };
+ 
+ }  // namespace content_settings
+--
+2.25.1

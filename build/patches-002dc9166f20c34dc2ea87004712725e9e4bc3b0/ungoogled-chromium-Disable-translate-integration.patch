@@ -1,0 +1,225 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Mon, 12 Feb 2018 21:28:53 +0100
+Subject: ungoogled-chromium: Disable translate integration
+
+Remove translate offer
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../xml/languages_detailed_preferences.xml    | 43 -------------------
+ .../java/res/xml/languages_preferences.xml    |  5 ---
+ .../language/settings/LanguageSettings.java   | 41 +-----------------
+ .../strings/android_chrome_strings.grd        |  3 --
+ .../core/browser/translate_manager.cc         |  5 ++-
+ .../core/browser/translate_script.cc          | 19 +++-----
+ 6 files changed, 11 insertions(+), 105 deletions(-)
+
+diff --git a/chrome/browser/language/android/java/res/xml/languages_detailed_preferences.xml b/chrome/browser/language/android/java/res/xml/languages_detailed_preferences.xml
+--- a/chrome/browser/language/android/java/res/xml/languages_detailed_preferences.xml
++++ b/chrome/browser/language/android/java/res/xml/languages_detailed_preferences.xml
+@@ -31,47 +31,4 @@ found in the LICENSE file.
+ 
+     </PreferenceCategory>
+ 
+-    <PreferenceCategory
+-        android:key="translation_settings_section"
+-        android:order="3"
+-        android:title="@string/languages_settings_translation_title"
+-        app:allowDividerAbove="true"
+-        app:allowDividerBelow="false">
+-
+-        <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-            android:key="translate_switch"
+-            android:summaryOn="@string/languages_send_translate_switch"
+-            android:summaryOff="@string/languages_send_translate_switch"
+-            app:allowDividerAbove="false"
+-            app:allowDividerBelow="true"/>
+-
+-        <PreferenceCategory
+-            android:key="translation_advanced_settings_section"
+-            android:layout="@layout/preference_category_no_title_or_padding"
+-            app:initialExpandedChildrenCount="0"
+-            app:allowDividerAbove="true"
+-            app:allowDividerBelow="false">
+-
+-            <org.chromium.chrome.browser.language.settings.LanguageItemPickerPreference
+-                android:key="translate_settings_target_language"
+-                android:title="@string/languages_settings_target"
+-                app:allowDividerAbove="false"
+-                app:allowDividerBelow="false" />
+-
+-            <org.chromium.chrome.browser.language.settings.LanguageItemListPreference
+-              android:key="translate_settings_always_languages"
+-              android:title="@string/languages_settings_automatic"
+-              app:allowDividerAbove="false"
+-              app:allowDividerBelow="false" />
+-
+-            <org.chromium.chrome.browser.language.settings.LanguageItemListPreference
+-              android:key="translate_settings_never_languages"
+-              android:title="@string/languages_settings_dont_offer_langs"
+-              app:allowDividerAbove="false"
+-              app:allowDividerBelow="false" />
+-
+-        </PreferenceCategory>
+-
+-    </PreferenceCategory>
+-
+ </PreferenceScreen>
+diff --git a/chrome/browser/language/android/java/res/xml/languages_preferences.xml b/chrome/browser/language/android/java/res/xml/languages_preferences.xml
+--- a/chrome/browser/language/android/java/res/xml/languages_preferences.xml
++++ b/chrome/browser/language/android/java/res/xml/languages_preferences.xml
+@@ -13,9 +13,4 @@ found in the LICENSE file.
+         android:layout="@layout/languages_preference"
+         android:widgetLayout="@layout/accept_languages_list" />
+ 
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="translate_switch"
+-        android:summaryOn="@string/languages_offer_translate_switch"
+-        android:summaryOff="@string/languages_offer_translate_switch" />
+-
+ </PreferenceScreen>
+diff --git a/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/settings/LanguageSettings.java b/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/settings/LanguageSettings.java
+--- a/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/settings/LanguageSettings.java
++++ b/chrome/browser/language/android/java/src/org/chromium/chrome/browser/language/settings/LanguageSettings.java
+@@ -50,12 +50,6 @@ public class LanguageSettings extends PreferenceFragmentCompat
+     static final String APP_LANGUAGE_PREFERENCE_KEY = "app_language_preference";
+     static final String PREFERRED_LANGUAGES_KEY = "preferred_languages";
+     static final String CONTENT_LANGUAGES_KEY = "content_languages_preference";
+-    static final String TRANSLATE_SWITCH_KEY = "translate_switch";
+-
+-    static final String TRANSLATION_ADVANCED_SECTION = "translation_advanced_settings_section";
+-    static final String TARGET_LANGUAGE_KEY = "translate_settings_target_language";
+-    static final String ALWAYS_LANGUAGES_KEY = "translate_settings_always_languages";
+-    static final String NEVER_LANGUAGES_KEY = "translate_settings_never_languages";
+ 
+     private static final String TAG = "LanguageSettings";
+ 
+@@ -106,27 +100,6 @@ public class LanguageSettings extends PreferenceFragmentCompat
+         ContentLanguagesPreference mLanguageListPref =
+                 (ContentLanguagesPreference) findPreference(PREFERRED_LANGUAGES_KEY);
+         mLanguageListPref.registerActivityLauncher(this);
+-
+-        ChromeSwitchPreference translateSwitch =
+-                (ChromeSwitchPreference) findPreference(TRANSLATE_SWITCH_KEY);
+-        boolean isTranslateEnabled = getPrefService().getBoolean(Pref.OFFER_TRANSLATE_ENABLED);
+-        translateSwitch.setChecked(isTranslateEnabled);
+-
+-        translateSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+-            @Override
+-            public boolean onPreferenceChange(Preference preference, Object newValue) {
+-                boolean enabled = (boolean) newValue;
+-                getPrefService().setBoolean(Pref.OFFER_TRANSLATE_ENABLED, enabled);
+-                mLanguageListPref.notifyPrefChanged();
+-                LanguagesManager.recordAction(enabled ? LanguagesManager.LanguageSettingsActionType
+-                                                                .ENABLE_TRANSLATE_GLOBALLY
+-                                                      : LanguagesManager.LanguageSettingsActionType
+-                                                                .DISABLE_TRANSLATE_GLOBALLY);
+-                return true;
+-            }
+-        });
+-        translateSwitch.setManagedPreferenceDelegate((ChromeManagedPreferenceDelegate) preference
+-                -> getPrefService().isManagedPreference(Pref.OFFER_TRANSLATE_ENABLED));
+     }
+ 
+     /**
+@@ -141,8 +114,6 @@ public class LanguageSettings extends PreferenceFragmentCompat
+         ContentLanguagesPreference mLanguageListPref =
+                 (ContentLanguagesPreference) findPreference(CONTENT_LANGUAGES_KEY);
+         mLanguageListPref.registerActivityLauncher(this);
+-
+-        setupTranslateSection(mLanguageListPref);
+     }
+ 
+     /**
+@@ -172,7 +143,7 @@ public class LanguageSettings extends PreferenceFragmentCompat
+      * @param contentLanguagesPreference ContentLanguagesPreference reference to update about state
+      *         changes.
+      */
+-    private void setupTranslateSection(ContentLanguagesPreference contentLanguagesPreference) {
++/*    private void setupTranslateSection(ContentLanguagesPreference contentLanguagesPreference) {
+         // Setup expandable advanced settings section.
+         PreferenceCategory translationAdvancedSection =
+                 (PreferenceCategory) findPreference(TRANSLATION_ADVANCED_SECTION);
+@@ -234,9 +205,7 @@ public class LanguageSettings extends PreferenceFragmentCompat
+                 return true;
+             }
+         });
+-        translateSwitch.setManagedPreferenceDelegate((ChromeManagedPreferenceDelegate) preference
+-                -> getPrefService().isManagedPreference(Pref.OFFER_TRANSLATE_ENABLED));
+-    }
++    } */
+ 
+     @Override
+     public void onStart() {
+@@ -274,12 +243,6 @@ public class LanguageSettings extends PreferenceFragmentCompat
+             // Set the default target language to match the new app language.
+             TranslateBridge.setDefaultTargetLanguage(code);
+         } else if (requestCode == REQUEST_CODE_CHANGE_TARGET_LANGUAGE) {
+-            LanguageItemPickerPreference targetLanguagePreference =
+-                    (LanguageItemPickerPreference) findPreference(TARGET_LANGUAGE_KEY);
+-            targetLanguagePreference.setLanguageItem(code);
+-            TranslateBridge.setDefaultTargetLanguage(code);
+-            LanguagesManager.recordAction(
+-                    LanguagesManager.LanguageSettingsActionType.CHANGE_TARGET_LANGUAGE);
+         }
+     }
+ 
+diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -1895,9 +1895,6 @@ Your Google account may have other forms of browsing history like searches and a
+       <message name="IDS_LANGUAGES_LIST_DESCRIPTION" desc="Description on the Languages settings screen. Appears above a list of one or more languages that the user selects, to tell Chrome which languages they prefer to use to read website content.">
+         Websites will show text in your preferred language, when possible.
+       </message>
+-      <message name="IDS_LANGUAGES_OFFER_TRANSLATE_SWITCH" desc="Appears next to the 'offer to translate' switch that controls whether or not Chrome will display the Google Translate UI on web pages that are not in the user's preferred language(s).">
+-        Offer to translate pages in other languages
+-      </message>
+       <message name="IDS_LANGUAGES_SEND_TRANSLATE_SWITCH" desc="Appears next to the switch controlling whether or not Chrome will offer to translate pages in other languages.  When enabled the Google Translate UI will be displayed on web pages that are not in the user's preferred language(s).">
+         Offer to send pages in other languages to Google Translate
+       </message>
+diff --git a/components/translate/core/browser/translate_manager.cc b/components/translate/core/browser/translate_manager.cc
+--- a/components/translate/core/browser/translate_manager.cc
++++ b/components/translate/core/browser/translate_manager.cc
+@@ -825,8 +825,9 @@ void TranslateManager::FilterIsTranslatePossible(
+         TriggerDecision::kDisabledOffline);
+   }
+ 
+-  if (!ignore_missing_key_for_testing_ &&
+-      !::google_apis::HasAPIKeyConfigured()) {
++//  if (!ignore_missing_key_for_testing_ &&
++//      !::google_apis::HasAPIKeyConfigured()) {
++    if (true) {
+     // Without an API key, translate won't work, so don't offer to translate in
+     // the first place. Leave kOfferTranslateEnabled on, though, because that
+     // settings syncs and we don't want to turn off translate everywhere else.
+diff --git a/components/translate/core/browser/translate_script.cc b/components/translate/core/browser/translate_script.cc
+--- a/components/translate/core/browser/translate_script.cc
++++ b/components/translate/core/browser/translate_script.cc
+@@ -125,19 +125,12 @@ void TranslateScript::OnScriptFetchComplete(bool success,
+     data_ = base::StringPrintf("var translateApiKey = '%s';\n",
+                                google_apis::GetAPIKey().c_str());
+ 
+-    // Insert server params to pass experimental params to google translate
+-    // server.
+-    std::string server_params;
+-    std::map<std::string, std::string> params;
+-    base::StringAppendF(
+-        &data_, "var gtTimeInfo = {'fetchStart': %0.f, 'fetchEnd': %0.f};\n",
+-        script_fetch_start_time_, base::Time::Now().ToJsTime());
+-    base::StringAppendF(&data_, "var serverParams = '%s';\n",
+-                        server_params.c_str());
+-
+-    GURL security_origin = translate::GetTranslateSecurityOrigin();
+-    base::StringAppendF(&data_, "var securityOrigin = '%s';",
+-                        security_origin.spec().c_str());
++     base::StringAppendF(&data_, "var serverParams = '';\n");
++     base::StringAppendF(
++         &data_, "var gtTimeInfo = {'fetchStart': %0.f, 'fetchEnd': %0.f};\n",
++         script_fetch_start_time_, base::Time::Now().ToJsTime());
++
++    base::StringAppendF(&data_, "var securityOrigin = '';");
+ 
+     // Load embedded translate.js.
+     data_.append(ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
+--
+2.25.1

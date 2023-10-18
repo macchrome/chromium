@@ -1,0 +1,42 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sun, 20 Jan 2019 06:20:10 +0100
+Subject: Do not ignore download location prompt setting
+
+Upstream has decided that it works as intended (https://bugs.chromium.org/p/chromium/issues/detail?id=916606)
+but users would like to decide where to save a file even when there is no SD card available;
+do not skip the prompt in such cases.
+
+Do not tick "Don't show again" by default
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ .../DownloadLocationDialogCoordinator.java        | 15 ---------------
+ 1 file changed, 15 deletions(-)
+
+diff --git a/chrome/browser/download/android/java/src/org/chromium/chrome/browser/download/dialogs/DownloadLocationDialogCoordinator.java b/chrome/browser/download/android/java/src/org/chromium/chrome/browser/download/dialogs/DownloadLocationDialogCoordinator.java
+--- a/chrome/browser/download/android/java/src/org/chromium/chrome/browser/download/dialogs/DownloadLocationDialogCoordinator.java
++++ b/chrome/browser/download/android/java/src/org/chromium/chrome/browser/download/dialogs/DownloadLocationDialogCoordinator.java
+@@ -131,21 +131,6 @@ public class DownloadLocationDialogCoordinator implements ModalDialogProperties.
+      * @param dirs An list of available download directories.
+      */
+     private void onDirectoryOptionsRetrieved(ArrayList<DirectoryOption> dirs) {
+-        // If there is only one directory available, don't show the default dialog, and set the
+-        // download directory to default. Dialog will still show for other types of dialogs, like
+-        // name conflict or disk error or if Incognito download warning is needed.
+-        if (dirs.size() == 1 && !mLocationDialogManaged
+-                && mDialogType == DownloadLocationDialogType.DEFAULT
+-                && !shouldShowIncognitoWarning()) {
+-            final DirectoryOption dir = dirs.get(0);
+-            if (dir.type == DirectoryOption.DownloadLocationDirectoryType.DEFAULT) {
+-                assert (!TextUtils.isEmpty(dir.location));
+-                DownloadDialogBridge.setDownloadAndSaveFileDefaultDirectory(dir.location);
+-                mController.onDownloadLocationDialogComplete(mSuggestedPath);
+-            }
+-            return;
+-        }
+-
+         // Already showing the dialog.
+         if (mDialogModel != null) return;
+ 
+--
+2.25.1

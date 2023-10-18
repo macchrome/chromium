@@ -1,0 +1,88 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Mon, 17 Jul 2023 15:24:16 +0000
+Subject: Keep Side Panel Companion disabled
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/companion/core/features.cc     | 19 ++++++++++---------
+ .../ui/side_search/side_search_prefs.cc       |  2 +-
+ chrome/browser/ui/ui_features.cc              |  2 +-
+ components/search_engines/template_url.cc     |  2 +-
+ 4 files changed, 13 insertions(+), 12 deletions(-)
+
+diff --git a/chrome/browser/companion/core/features.cc b/chrome/browser/companion/core/features.cc
+--- a/chrome/browser/companion/core/features.cc
++++ b/chrome/browser/companion/core/features.cc
+@@ -23,17 +23,17 @@ namespace internal {
+ // `kSidePanelCompanion2`. This makes it possible for Companion to be
+ // enabled via multiple field trials (e.g., one that's session consistent, other
+ // that's permanent consistent).
+-BASE_FEATURE(kSidePanelCompanion,
+-             "SidePanelCompanion",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
+-BASE_FEATURE(kSidePanelCompanion2,
+-             "SidePanelCompanion2",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kSidePanelCompanion,                           // keep
++             "SidePanelCompanion",                          // disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);            // in bromite
++BASE_FEATURE(kSidePanelCompanion2,                          // keep
++             "SidePanelCompanion2",                         // disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);            // in bromite
+ // Dynamically enables the search companion if the user has experiments
+ // enabled.
+-BASE_FEATURE(kCompanionEnabledByObservingExpsNavigations,
+-             "CompanionEnabledByObservingExpsNavigations",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kCompanionEnabledByObservingExpsNavigations,   // keep
++             "CompanionEnabledByObservingExpsNavigations",  // disabled
++             base::FEATURE_DISABLED_BY_DEFAULT);            // in bromite
+ }  // namespace internal
+ 
+ // When search companion is enabled, show a context menu item that allows the
+@@ -57,6 +57,7 @@ const char kDisableCheckUserPermissionsForCompanion[] =
+ const char kForceCompanionPinnedState[] = "force-companion-pinned-state";
+ 
+ bool ShouldOverrideCheckingUserPermissionsForCompanion() {
++  if ((true)) return false;
+   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+   return command_line->HasSwitch(kDisableCheckUserPermissionsForCompanion);
+ }
+diff --git a/chrome/browser/ui/side_search/side_search_prefs.cc b/chrome/browser/ui/side_search/side_search_prefs.cc
+--- a/chrome/browser/ui/side_search/side_search_prefs.cc
++++ b/chrome/browser/ui/side_search/side_search_prefs.cc
+@@ -13,7 +13,7 @@ namespace side_search_prefs {
+ const char kSideSearchEnabled[] = "side_search.enabled";
+ 
+ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+-  registry->RegisterBooleanPref(kSideSearchEnabled, true);
++  registry->RegisterBooleanPref(kSideSearchEnabled, false);
+ }
+ 
+ }  // namespace side_search_prefs
+diff --git a/chrome/browser/ui/ui_features.cc b/chrome/browser/ui/ui_features.cc
+--- a/chrome/browser/ui/ui_features.cc
++++ b/chrome/browser/ui/ui_features.cc
+@@ -121,7 +121,7 @@ BASE_FEATURE(kResponsiveToolbar,
+ 
+ // Enables the side search feature for Google Search. Presents recent Google
+ // search results in a browser side panel.
+-BASE_FEATURE(kSideSearch, "SideSearch", base::FEATURE_ENABLED_BY_DEFAULT);
++BASE_FEATURE(kSideSearch, "SideSearch", base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ BASE_FEATURE(kSideSearchFeedback,
+              "SideSearchFeedback",
+diff --git a/components/search_engines/template_url.cc b/components/search_engines/template_url.cc
+--- a/components/search_engines/template_url.cc
++++ b/components/search_engines/template_url.cc
+@@ -1829,7 +1829,7 @@ GURL TemplateURL::GenerateSuggestionURL(
+ }
+ 
+ bool TemplateURL::IsSideSearchSupported() const {
+-  return !side_search_param().empty();
++  return false;
+ }
+ 
+ bool TemplateURL::IsSideImageSearchSupported() const {
+--
+2.25.1

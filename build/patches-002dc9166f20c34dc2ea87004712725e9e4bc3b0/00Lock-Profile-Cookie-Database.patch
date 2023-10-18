@@ -1,0 +1,25 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Mon, 17 Jul 2023 15:24:54 +0000
+Subject: Lock Profile Cookie Database
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/browser_features.cc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/browser_features.cc b/chrome/browser/browser_features.cc
+--- a/chrome/browser/browser_features.cc
++++ b/chrome/browser/browser_features.cc
+@@ -207,8 +207,8 @@ BASE_FEATURE(kAppBoundEncryptionMetrics,
+ // Enables locking the cookie database for profiles.
+ // TODO(crbug.com/1430226): Remove after fully launched.
+ BASE_FEATURE(kLockProfileCookieDatabase,
+-             "LockProfileCookieDatabase",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             "LockProfileCookieDatabase",        // enabled
++             base::FEATURE_ENABLED_BY_DEFAULT);  // by default
+ #endif
+ 
+ // Enables showing the email of the flex org admin that setup CBCM in the
+--
+2.25.1

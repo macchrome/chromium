@@ -1,0 +1,78 @@
+From: csagan5 <32685696+csagan5@users.noreply.github.com>
+Date: Sat, 28 Apr 2018 08:30:26 +0200
+Subject: Reduce HTTP headers in DoH requests to bare minimum
+
+License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
+---
+ net/base/load_flags_list.h              |  6 ++++++
+ net/dns/dns_transaction.cc              |  2 +-
+ net/url_request/url_request_http_job.cc | 10 +++++++---
+ 3 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/net/base/load_flags_list.h b/net/base/load_flags_list.h
+--- a/net/base/load_flags_list.h
++++ b/net/base/load_flags_list.h
+@@ -110,3 +110,9 @@ LOAD_FLAG(CAN_USE_SHARED_DICTIONARY, 1 << 17)
+ // Indicates that CAN_USE_SHARED_DICTIONARY must be disabled after a redirect to
+ // another origin.
+ LOAD_FLAG(DISABLE_SHARED_DICTIONARY_AFTER_CROSS_ORIGIN_REDIRECT, 1 << 18)
++
++// This load will not send Accept-Language or User-Agent headers, and not
++// advertise brotli encoding.
++// Used to comply with IETF (draft) DNS-over-HTTPS:
++// "Implementors SHOULD NOT set non-essential HTTP headers in DoH client requests."
++LOAD_FLAG(MINIMAL_HEADERS, 1 << 19)
+diff --git a/net/dns/dns_transaction.cc b/net/dns/dns_transaction.cc
+--- a/net/dns/dns_transaction.cc
++++ b/net/dns/dns_transaction.cc
+@@ -480,7 +480,7 @@ class DnsHTTPAttempt : public DnsAttempt, public URLRequest::Delegate {
+     // avoid deadlock and enable the use of preconfigured IP addresses.
+     request_->SetSecureDnsPolicy(SecureDnsPolicy::kBootstrap);
+     request_->SetLoadFlags(request_->load_flags() | LOAD_DISABLE_CACHE |
+-                           LOAD_BYPASS_PROXY);
++                           LOAD_MINIMAL_HEADERS | LOAD_BYPASS_PROXY);
+     request_->set_allow_credentials(false);
+     request_->set_isolation_info(isolation_info);
+   }
+diff --git a/net/url_request/url_request_http_job.cc b/net/url_request/url_request_http_job.cc
+--- a/net/url_request/url_request_http_job.cc
++++ b/net/url_request/url_request_http_job.cc
+@@ -379,6 +379,7 @@ void URLRequestHttpJob::OnGotFirstPartySetCacheFilterMatchInfo(
+   // fields in the referrer.
+   GURL referrer(request_->referrer());
+ 
++  if (!(request_info_.load_flags & LOAD_MINIMAL_HEADERS)) {
+   // Our consumer should have made sure that this is a safe referrer (e.g. via
+   // URLRequestJob::ComputeReferrerForPolicy).
+   if (referrer.is_valid()) {
+@@ -386,11 +387,14 @@ void URLRequestHttpJob::OnGotFirstPartySetCacheFilterMatchInfo(
+     request_info_.extra_headers.SetHeader(HttpRequestHeaders::kReferer,
+                                           referer_value);
+   }
++  }
+ 
++  if (!(request_info_.load_flags & LOAD_MINIMAL_HEADERS)) {
+   request_info_.extra_headers.SetHeaderIfMissing(
+       HttpRequestHeaders::kUserAgent,
+       http_user_agent_settings_ ?
+           http_user_agent_settings_->GetUserAgent() : std::string());
++  }
+ 
+   AddExtraHeaders();
+ 
+@@ -647,10 +651,10 @@ void URLRequestHttpJob::StartTransactionInternal() {
+ void URLRequestHttpJob::AddExtraHeaders() {
+   request_info_.extra_headers.SetAcceptEncodingIfMissing(
+       request()->url(), request()->accepted_stream_types(),
+-      request()->context()->enable_brotli(),
+-      request()->context()->enable_zstd());
++      !(request_info_.load_flags & LOAD_MINIMAL_HEADERS) && request()->context()->enable_brotli(),
++      !(request_info_.load_flags & LOAD_MINIMAL_HEADERS) && request()->context()->enable_zstd());
+ 
+-  if (http_user_agent_settings_) {
++  if (!(request_info_.load_flags & LOAD_MINIMAL_HEADERS) && http_user_agent_settings_) {
+     // Only add default Accept-Language if the request didn't have it
+     // specified.
+     std::string accept_language =
+--
+2.25.1

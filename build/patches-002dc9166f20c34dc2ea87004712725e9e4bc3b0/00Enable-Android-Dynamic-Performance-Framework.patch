@@ -1,0 +1,40 @@
+From: uazo <uazo@users.noreply.github.com>
+Date: Wed, 23 Aug 2023 13:49:19 +0000
+Subject: Enable Android Dynamic Performance Framework
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/version.gni                | 2 +-
+ components/viz/common/features.cc | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/chrome/version.gni b/chrome/version.gni
+--- a/chrome/version.gni
++++ b/chrome/version.gni
+@@ -68,7 +68,7 @@ if (is_mac) {
+     _version_dictionary_template += "trichrome_auto_64_32_version_code = \"@TRICHROME_AUTO_64_32_VERSION_CODE@\" "
+     _version_dictionary_template +=
+         "trichrome_64_version_code = \"@TRICHROME_64_VERSION_CODE@\" "
+-    if (target_cpu == "arm64") {
++    if (target_cpu == "arm64" || target_cpu == "x64") {
+       _version_dictionary_template += "trichrome_64_32_high_version_code = \"@TRICHROME_64_32_HIGH_VERSION_CODE@\" "
+       _version_dictionary_template += "trichrome_auto_64_32_high_version_code = \"@TRICHROME_AUTO_64_32_HIGH_VERSION_CODE@\" "
+     }
+diff --git a/components/viz/common/features.cc b/components/viz/common/features.cc
+--- a/components/viz/common/features.cc
++++ b/components/viz/common/features.cc
+@@ -298,9 +298,10 @@ const base::FeatureParam<double> kADPFMidFrameBoostDurationMultiplier{
+ 
+ // If enabled, Chrome includes the Renderer Main thread(s) into the
+ // ADPF(Android Dynamic Performance Framework) hint session.
++// see https://source.chromium.org/chromium/chromium/src/+/e7507d15614ac7f499fb89086b3a09772fa8deb4
+ BASE_FEATURE(kEnableADPFRendererMain,
+-             "EnableADPFRendererMain",
+-             base::FEATURE_DISABLED_BY_DEFAULT);
++             "EnableADPFRendererMain",           // enabled
++             base::FEATURE_ENABLED_BY_DEFAULT);  // by default
+ 
+ // If enabled, surface activation and draw do not block on dependencies.
+ BASE_FEATURE(kDrawImmediatelyWhenInteractive,
+--
+2.25.1
